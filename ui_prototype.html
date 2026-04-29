@@ -358,7 +358,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
 <body>
 
 <!-- TradingView lightweight-charts -->
-<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.min.js"></script>
 
 <!-- Sidebar -->
 <aside class="sidebar">
@@ -607,7 +607,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
         </div>
       </div>
       <div class="btn-group">
-        <button class="btn btn-primary" style="flex:1;">▶ 开始扫描</button>
+        <button class="btn btn-primary" style="flex:1;" id="btnScan">▶ 开始扫描</button>
         <button class="btn btn-secondary">⏹ 停止</button>
       </div>
     </div>
@@ -624,7 +624,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
       </div>
     </div>
     <div class="card-body">
-      <div class="progress-meta"><span>扫描进度</span><span>500 / 500</span></div>
+      <div class="progress-meta"><span>扫描进度</span><span id="scanStatus">就绪</span></div>
       <div class="progress-bar"><div class="progress-fill" style="width:100%;"></div></div>
 
       <div class="log-panel">
@@ -722,7 +722,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 // ============================================================
 // API
 // ============================================================
-const API = 'http://localhost:5555';
+const API = '';
 
 async function apiGet(url) {
   const r = await fetch(API + url);
@@ -1055,6 +1055,19 @@ window.addEventListener('load', () => {
 });
 
 document.getElementById('btnScan').addEventListener('click', runScan);
+
+// Static scan result rows → navigate to stock analysis
+document.querySelectorAll('#scanResultTable tbody .clickable-row').forEach(tr => {
+  tr.addEventListener('click', () => {
+    const code = tr.dataset.code;
+    const name = tr.dataset.name;
+    document.getElementById('stockCode').value = code;
+    document.getElementById('stockName').textContent = name;
+    document.getElementById('stockCodeDisplay').textContent = code;
+    navigateTo('stock');
+    loadMainChart(code);
+  });
+});
 </script>
 </body>
 </html>

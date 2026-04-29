@@ -24,6 +24,11 @@ def make_config(overrides: dict) -> dict:
     return cfg
 
 
+@app.route('/')
+def index():
+    return app.send_static_file('ui_prototype.html')
+
+
 @app.route('/api/health')
 def health():
     return jsonify({'status': 'ok', 'time': datetime.now().isoformat()})
