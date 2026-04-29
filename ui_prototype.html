@@ -289,24 +289,52 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 
 /* Timeline */
-.timeline { }
-.timeline-item {
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--divider);
-  margin-bottom: 8px;
-  background: rgba(0,0,0,0.01);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.timeline-item:hover { border-color: var(--accent); background: rgba(0,113,227,0.03); }
-.timeline-item.active { border-color: rgba(0,113,227,0.3); background: rgba(0,113,227,0.04); }
-.timeline-item .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.timeline-item .left { display: flex; flex-direction: column; gap: 5px; }
-.timeline-item .date { font-size: 11px; color: var(--text-secondary); font-weight: 600; }
-.timeline-item .meta { font-size: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .timeline { }
+  .timeline-item {
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--divider);
+    margin-bottom: 8px;
+    background: rgba(0,0,0,0.01);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .timeline-item:hover { border-color: var(--accent); background: rgba(0,113,227,0.03); }
+  .timeline-item.active { border-color: rgba(0,113,227,0.3); background: rgba(0,113,227,0.04); }
+  .timeline-item .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .timeline-item .left { display: flex; flex-direction: column; gap: 3px; }
+  .timeline-item .date { font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+  .timeline-item .phase-range { font-size: 10px; color: var(--text-tertiary); }
+  .timeline-item .meta { font-size: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
 
-.stock-info {
+  /* Param row in stock analysis */
+  .param-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-end; }
+  .param-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 120px; }
+  .param-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+  .param-input {
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    border: 1.5px solid var(--divider);
+    border-radius: var(--radius-sm);
+    background: rgba(0,0,0,0.02);
+    color: var(--text-primary);
+    outline: none;
+    width: 100%;
+  }
+  .param-input:focus { border-color: var(--accent); background: white; }
+
+  /* Chart tabs */
+  .chart-tabs { display: flex; gap: 2px; background: rgba(0,0,0,0.04); border-radius: var(--radius-sm); padding: 2px; width: fit-content; }
+  .chart-tab { padding: 5px 14px; font-size: 12px; font-weight: 600; font-family: inherit; border: none; background: none; border-radius: 6px; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
+  .chart-tab.active { background: var(--card); color: var(--text-primary); box-shadow: var(--shadow-sm); }
+  .chart-tab:hover:not(.active) { color: var(--text-primary); }
+
+  /* Scan result detail chart */
+  .scan-chart-container { position: relative; width: 100%; height: 280px; border-radius: var(--radius-md); overflow: hidden; }
+  .scan-chart-legend { display: flex; gap: 16px; font-size: 11px; color: var(--text-secondary); margin-top: 6px; }
+
+  .stock-info {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -431,9 +459,40 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
         <div id="chart" style="width:100%;height:100%;"></div>
       </div>
       <div class="chart-legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#FF453A;"></div>上涨段（均线多头）</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#007AFF;"></div>盘整段（布林带收窄）</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#30D158;"></div>当前选中阶段</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#FF453A;"></div>上涨段</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#007AFF;"></div>盘整段</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#FF9F0A;"></div>MA5</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#5856D6;"></div>MA10</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#34C759;"></div>MA20</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#FF3B30;"></div>MA60</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 形态参数 -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">形态参数</span>
+    </div>
+    <div class="card-body">
+      <div class="param-row">
+        <div class="param-group">
+          <div class="param-label">上涨涨幅（%）</div>
+          <input class="param-input" type="number" id="paramGain" value="15" min="5" max="50" step="1">
+        </div>
+        <div class="param-group">
+          <div class="param-label">盘整最小天数</div>
+          <input class="param-input" type="number" id="paramConsolMin" value="10" min="5" max="60" step="1">
+        </div>
+        <div class="param-group">
+          <div class="param-label">盘整最大天数</div>
+          <input class="param-input" type="number" id="paramConsolMax" value="40" min="20" max="120" step="5">
+        </div>
+        <div class="param-group">
+          <div class="param-label">布林带宽</div>
+          <input class="param-input" type="number" id="paramBandwidth" value="0.20" min="0.05" max="0.50" step="0.01">
+        </div>
+        <button class="btn btn-primary" id="btnAnalyze2" style="flex-shrink:0;">▶ 重新分析</button>
       </div>
     </div>
   </div>
@@ -450,6 +509,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
           <div class="row">
             <div class="left">
               <div class="date">2026-02-10（最新）</div>
+              <div class="phase-range">↑ 2025-11-04 → 2026-01-15　▬ 2026-01-16 → 2026-02-10</div>
               <div class="meta">
                 <span class="tag tag-red">↑ +15.4%</span>
                 <span class="tag tag-blue">盘整14天</span>
@@ -463,6 +523,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
           <div class="row">
             <div class="left">
               <div class="date">2025-09-03</div>
+              <div class="phase-range">↑ 2025-06-15 → 2025-09-03　▬ 2025-09-04 → 2025-09-16</div>
               <div class="meta">
                 <span class="tag tag-red">↑ +15.3%</span>
                 <span class="tag tag-blue">盘整13天</span>
@@ -476,6 +537,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
           <div class="row">
             <div class="left">
               <div class="date">2025-08-12</div>
+              <div class="phase-range">↑ 2025-06-20 → 2025-08-12　▬ 2025-08-13 → 2025-08-31</div>
               <div class="meta">
                 <span class="tag tag-red">↑ +18.5%</span>
                 <span class="tag tag-blue">盘整19天</span>
@@ -582,33 +644,59 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
             </tr>
           </thead>
           <tbody>
-            <tr class="clickable-row" data-code="603135" data-name="中重科技">
+            <tr class="clickable-row" data-code="603135" data-name="中重科技" data-phase="0">
               <td><code>603135</code></td><td>中重科技</td>
               <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:85%;background:var(--accent);"></span></span><span class="score-text" style="color:var(--accent);">0.85</span></span></td>
               <td style="color:var(--red);">+15.4%</td><td>14天</td><td><span class="tag tag-green">已匹配</span></td>
             </tr>
-            <tr class="clickable-row" data-code="301439" data-name="泓淋电力">
+            <tr class="clickable-row" data-code="301439" data-name="泓淋电力" data-phase="1">
               <td><code>301439</code></td><td>泓淋电力</td>
               <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:82%;background:var(--accent);"></span></span><span class="score-text" style="color:var(--accent);">0.82</span></span></td>
               <td style="color:var(--red);">+15.3%</td><td>13天</td><td><span class="tag tag-green">已匹配</span></td>
             </tr>
-            <tr class="clickable-row" data-code="600831" data-name="广电网络">
+            <tr class="clickable-row" data-code="600831" data-name="广电网络" data-phase="2">
               <td><code>600831</code></td><td>广电网络</td>
               <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:78%;background:var(--accent);"></span></span><span class="score-text" style="color:var(--accent);">0.78</span></span></td>
               <td style="color:var(--red);">+18.5%</td><td>19天</td><td><span class="tag tag-green">已匹配</span></td>
             </tr>
-            <tr class="clickable-row" data-code="600054" data-name="黄山旅游">
+            <tr class="clickable-row" data-code="600054" data-name="黄山旅游" data-phase="3">
               <td><code>600054</code></td><td>黄山旅游</td>
               <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:95%;background:var(--orange);"></span></span><span class="score-text" style="color:var(--orange);">0.95</span></span></td>
               <td style="color:var(--red);">+26.3%</td><td>52天</td><td><span class="tag tag-orange">观察中</span></td>
             </tr>
-            <tr class="clickable-row" data-code="600188" data-name="兖矿能源">
+            <tr class="clickable-row" data-code="600188" data-name="兖矿能源" data-phase="4">
               <td><code>600188</code></td><td>兖矿能源</td>
               <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:91%;background:var(--orange);"></span></span><span class="score-text" style="color:var(--orange);">0.91</span></span></td>
               <td style="color:var(--red);">+60.3%</td><td>33天</td><td><span class="tag tag-orange">观察中</span></td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- 点击股票后展开的详情图 -->
+      <div id="scanStockDetail" style="display:none; margin-top:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span id="scanDetailName" style="font-size:15px;font-weight:700;"></span>
+            <span id="scanDetailCode" style="font-size:12px;color:var(--text-secondary);font-family:'SF Mono',monospace;"></span>
+            <span id="scanDetailPhase" class="tag tag-blue"></span>
+          </div>
+          <div class="chart-tabs">
+            <button class="chart-tab active" data-ctab="daily">日K</button>
+            <button class="chart-tab" data-ctab="intraday">分时</button>
+          </div>
+        </div>
+        <div class="scan-chart-container">
+          <div id="scanChart" style="width:100%;height:100%;"></div>
+        </div>
+        <div class="scan-chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#FF453A;"></div>上涨段</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#007AFF;"></div>盘整段</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#FF9F0A;"></div>MA5</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#5856D6;"></div>MA10</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#34C759;"></div>MA20</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#FF3B30;"></div>MA60</div>
+        </div>
       </div>
     </div>
   </div>
@@ -632,26 +720,44 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 });
 
 // ============================================================
-// SCAN RESULT ROWS → go to stock analysis
+// SCAN RESULT ROWS → expand inline chart
 // ============================================================
 document.querySelectorAll('.clickable-row').forEach(row => {
   row.addEventListener('click', () => {
     const code = row.dataset.code;
     const name = row.dataset.name;
+    const phaseIdx = row.dataset.phase;
+
     document.getElementById('stockCode').value = code;
     document.getElementById('stockName').textContent = name;
     document.getElementById('stockCodeDisplay').textContent = code;
-    navigateTo('stock');
-    loadChart(code);
+
+    const detail = document.getElementById('scanStockDetail');
+    detail.style.display = 'block';
+    document.getElementById('scanDetailName').textContent = name;
+    document.getElementById('scanDetailCode').textContent = code;
+    document.getElementById('scanDetailPhase').textContent = '↑ 2025-11-04 → 2026-01-15  ▬ 2026-01-16 → 2026-02-10';
+
+    document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector('.chart-tab[data-ctab="daily"]').classList.add('active');
+
+    loadScanChart(code, 'daily');
+
+    detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 });
 
 // ============================================================
-// ANALYSIS BUTTON
+// ANALYSIS BUTTONS
 // ============================================================
 document.getElementById('btnAnalyze').addEventListener('click', () => {
   const code = document.getElementById('stockCode').value.trim();
-  if (code) loadChart(code);
+  if (code) loadMainChart(code);
+});
+
+document.getElementById('btnAnalyze2').addEventListener('click', () => {
+  const code = document.getElementById('stockCode').value.trim();
+  if (code) loadMainChart(code);
 });
 
 document.getElementById('stockSelect').addEventListener('change', (e) => {
@@ -661,148 +767,216 @@ document.getElementById('stockSelect').addEventListener('change', (e) => {
   document.getElementById('stockCode').value = val;
   document.getElementById('stockName').textContent = name;
   document.getElementById('stockCodeDisplay').textContent = val;
-  loadChart(val);
+  loadMainChart(val);
 });
 
 // ============================================================
-// CHART — generate realistic mock OHLCV data
+// CHART TAB SWITCHING (scan detail chart)
 // ============================================================
-const PHASES = [
-  { start: '2025-02-10', uptrendEnd: '2025-04-20', consolEnd: '2025-05-10', gain: 0.154, consol: 14 },
-  { start: '2025-06-01', uptrendEnd: '2025-09-03', consolEnd: '2025-09-16', gain: 0.153, consol: 13 },
+document.querySelectorAll('.chart-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const code = document.getElementById('scanDetailCode').textContent;
+    if (code) loadScanChart(code, tab.dataset.ctab);
+  });
+});
+
+// ============================================================
+// DATA GENERATION
+// ============================================================
+const SCAN_PHASES = [
+  { start: '2025-11-04', uptrendEnd: '2026-01-15', consolEnd: '2026-02-10', gain: 0.154, consol: 14 },
+  { start: '2025-06-15', uptrendEnd: '2025-09-03', consolEnd: '2025-09-16', gain: 0.153, consol: 13 },
   { start: '2025-06-20', uptrendEnd: '2025-08-12', consolEnd: '2025-08-31', gain: 0.185, consol: 19 },
+  { start: '2025-03-01', uptrendEnd: '2025-06-10', consolEnd: '2025-08-05', gain: 0.263, consol: 52 },
+  { start: '2025-01-10', uptrendEnd: '2025-04-25', consolEnd: '2025-05-28', gain: 0.603, consol: 33 },
 ];
 
-function dateStr(d) {
-  return d.toISOString().slice(0, 10);
-}
+function ds(d) { return d.toISOString().slice(0, 10); }
 
-function generateOHLCV(code) {
+function generateOHLCV() {
   const data = [];
   let price = 15 + Math.random() * 5;
   let t = new Date('2024-01-01');
   const end = new Date('2026-04-30');
-
   while (t <= end) {
-    if (t.getDay() === 0 || t.getDay() === 6) { t.setDate(t.getDate() + 1); continue; }
-
-    const dayStr = dateStr(t);
-    const open = price * (1 + (Math.random() - 0.5) * 0.015);
-    const close = open * (1 + (Math.random() - 0.48) * 0.025);
-    const high = Math.max(open, close) * (1 + Math.random() * 0.01);
-    const low = Math.min(open, close) * (1 - Math.random() * 0.01);
-    const vol = 5_000_000 + Math.random() * 10_000_000;
-
-    data.push({ time: dayStr, open: +open.toFixed(3), high: +high.toFixed(3), low: +low.toFixed(3), close: +close.toFixed(3), volume: Math.round(vol) });
-    price = close;
+    if (t.getDay() !== 0 && t.getDay() !== 6) {
+      const o = price * (1 + (Math.random() - 0.5) * 0.015);
+      const c = o * (1 + (Math.random() - 0.48) * 0.025);
+      const h = Math.max(o, c) * (1 + Math.random() * 0.01);
+      const l = Math.min(o, c) * (1 - Math.random() * 0.01);
+      data.push({ time: ds(t), open: +o.toFixed(3), high: +h.toFixed(3), low: +l.toFixed(3), close: +c.toFixed(3), volume: Math.round(5_000_000 + Math.random() * 10_000_000) });
+      price = c;
+    }
     t.setDate(t.getDate() + 1);
   }
   return data;
 }
 
-let chart = null;
-let candleSeries = null;
-let uptrendLineSeries = null;
-let consolLineSeries = null;
-let currentPhases = [];
+function generateIntraday(basePrice) {
+  const data = [];
+  const date = new Date('2026-02-10');
+  for (let i = 0; i < 240; i++) {
+    const t = new Date(date);
+    t.setHours(9, 30 + i, 0, 0);
+    const pct = (Math.random() - 0.49) * 0.001;
+    const price = basePrice * (1 + pct);
+    data.push({ time: ds(t) + ' ' + String(t.getHours()).padStart(2,'0') + ':'+String(t.getMinutes()).padStart(2,'0')+':00', value: +price.toFixed(3) });
+    basePrice = price;
+  }
+  return data;
+}
 
-function loadChart(code) {
+function calcMA(data, period) {
+  return data.map((d, i) => {
+    if (i < period - 1) return null;
+    const slice = data.slice(i - period + 1, i + 1);
+    const avg = slice.reduce((s, x) => s + x.close, 0) / period;
+    return { time: d.time, value: +avg.toFixed(3) };
+  }).filter(Boolean);
+}
+
+// ============================================================
+// MAIN CHART (stock analysis page)
+// ============================================================
+let mainChart = null;
+let mainCandle = null;
+let mainPhases = [];
+let mainData = [];
+
+function loadMainChart(code) {
   const container = document.getElementById('chart');
   container.innerHTML = '';
+  if (mainChart) { mainChart.remove(); mainChart = null; }
 
-  if (chart) { chart.remove(); chart = null; }
+  mainData = generateOHLCV();
 
-  chart = LightweightCharts.createChart(container, {
+  mainChart = LightweightCharts.createChart(container, {
     width: container.clientWidth,
-    height: container.clientHeight || 360,
-    layout: {
-      background: { type: 'solid', color: '#ffffff' },
-      textColor: '#86868B',
-      fontSize: 11,
-    },
-    grid: {
-      vertLines: { color: 'rgba(0,0,0,0.05)' },
-      horzLines: { color: 'rgba(0,0,0,0.05)' },
-    },
+    height: 360,
+    layout: { background: { type: 'solid', color: '#fff' }, textColor: '#86868B', fontSize: 11 },
+    grid: { vertLines: { color: 'rgba(0,0,0,0.05)' }, horzLines: { color: 'rgba(0,0,0,0.05)' } },
     crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-    timeScale: {
-      borderColor: 'rgba(0,0,0,0.06)',
-      timeVisible: true,
-    },
+    timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: false, secondsVisible: false },
     rightPriceScale: { borderColor: 'rgba(0,0,0,0.06)' },
+    handleScroll: true,
+    handleScale: true,
   });
 
-  candleSeries = chart.addCandlestickSeries({
-    upColor: '#FF453A',
-    downColor: '#30D158',
-    borderUpColor: '#FF453A',
-    borderDownColor: '#30D158',
-    wickUpColor: '#FF453A',
-    wickDownColor: '#30D158',
+  mainCandle = mainChart.addCandlestickSeries({
+    upColor: '#FF453A', downColor: '#30D158',
+    borderUpColor: '#FF453A', borderDownColor: '#30D158',
+    wickUpColor: '#FF453A', wickDownColor: '#30D158',
+  });
+  mainCandle.setData(mainData);
+
+  const ma5 = mainChart.addLineSeries({ color: '#FF9F0A', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+  const ma10 = mainChart.addLineSeries({ color: '#5856D6', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+  const ma20 = mainChart.addLineSeries({ color: '#34C759', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+  const ma60 = mainChart.addLineSeries({ color: '#FF3B30', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+  ma5.setData(calcMA(mainData, 5));
+  ma10.setData(calcMA(mainData, 10));
+  ma20.setData(calcMA(mainData, 20));
+  ma60.setData(calcMA(mainData, 60));
+
+  mainPhases = SCAN_PHASES.map(p => ({
+    ...p,
+    upData: mainData.filter(d => d.time >= p.start && d.time <= p.uptrendEnd).map(d => ({ time: d.time, value: d.high * 1.003 })),
+    conData: mainData.filter(d => d.time > p.uptrendEnd && d.time <= p.consolEnd).map(d => ({ time: d.time, value: d.high * 1.003 })),
+  }));
+
+  const upSer = mainChart.addLineSeries({ color: 'rgba(255,69,58,0.55)', lineWidth: 2, lineStyle: 0, crosshairMarkerVisible: false, priceLineVisible: false });
+  const conSer = mainChart.addLineSeries({ color: 'rgba(0,122,255,0.55)', lineWidth: 2, lineStyle: 0, crosshairMarkerVisible: false, priceLineVisible: false });
+  mainPhases.forEach(p => {
+    if (p.upData.length) upSer.setData(p.upData);
+    if (p.conData.length) conSer.setData(p.conData);
   });
 
-  uptrendLineSeries = chart.addLineSeries({
-    color: 'rgba(255,69,58,0.5)',
-    lineWidth: 2,
-    lineStyle: LightweightCharts.LineStyle.Solid,
-    crosshairMarkerVisible: false,
-  });
+  document.querySelectorAll('.range-btn').forEach(b => { b.classList.remove('active'); if (b.dataset.range === '1y') b.classList.add('active'); });
+  mainChart.timeScale().fitContent();
 
-  consolLineSeries = chart.addLineSeries({
-    color: 'rgba(0,122,255,0.5)',
-    lineWidth: 2,
-    lineStyle: LightweightCharts.LineStyle.Solid,
-    crosshairMarkerVisible: false,
-  });
-
-  const allData = generateOHLCV(code);
-  candleSeries.setData(allData);
-
-  currentPhases = JSON.parse(JSON.stringify(PHASES));
-  currentPhases.forEach(p => {
-    p.uptrendData = allData.filter(d => d.time >= p.start && d.time <= p.uptrendEnd).map(d => ({ time: d.time, value: d.high * 1.005 }));
-    p.consolData = allData.filter(d => d.time > p.uptrendEnd && d.time <= p.consolEnd).map(d => ({ time: d.time, value: d.high * 1.005 }));
-  });
-
-  currentPhases.forEach((p, i) => {
-    if (p.uptrendData.length > 0) uptrendLineSeries.setData(p.uptrendData);
-    if (p.consolData.length > 0) consolLineSeries.setData(p.consolData);
-  });
-
-  // Range buttons
-  document.querySelectorAll('.range-btn').forEach(btn => {
-    btn.classList.remove('active');
-    if (btn.dataset.range === '1y') btn.classList.add('active');
-  });
-
-  chart.timeScale().fitContent();
-
-  // Click phase → scroll to it
   document.querySelectorAll('.timeline-item').forEach(item => {
-    item.addEventListener('click', () => {
+    item.onclick = () => {
       document.querySelectorAll('.timeline-item').forEach(i => i.classList.remove('active'));
       item.classList.add('active');
       const idx = parseInt(item.dataset.phase);
-      if (currentPhases[idx] && currentPhases[idx].uptrendData.length > 0) {
-        chart.timeScale().setVisibleRange({
-          from: new Date(currentPhases[idx].start).getTime() / 1000,
-          to: new Date(currentPhases[idx].consolEnd).getTime() / 1000,
+      if (mainPhases[idx] && mainPhases[idx].upData.length) {
+        mainChart.timeScale().setVisibleRange({
+          from: new Date(mainPhases[idx].start).getTime() / 1000,
+          to: new Date(mainPhases[idx].consolEnd).getTime() / 1000,
         });
       }
-    });
+    };
   });
 
-  // Resize
-  window.addEventListener('resize', () => {
-    if (chart && container.clientWidth > 0) {
-      chart.applyOptions({ width: container.clientWidth });
-    }
-  });
+  window._mainChartResize = () => { if (mainChart) mainChart.applyOptions({ width: container.clientWidth }); };
+  window.addEventListener('resize', window._mainChartResize);
 }
 
-// Init chart on load
+// ============================================================
+// SCAN DETAIL CHART
+// ============================================================
+let scanChart = null;
+
+function loadScanChart(code, mode) {
+  const container = document.getElementById('scanChart');
+  container.innerHTML = '';
+  if (scanChart) { scanChart.remove(); scanChart = null; }
+
+  if (mode === 'intraday') {
+    scanChart = LightweightCharts.createChart(container, {
+      width: container.clientWidth, height: 280,
+      layout: { background: { type: 'solid', color: '#fff' }, textColor: '#86868B', fontSize: 11 },
+      grid: { vertLines: { color: 'rgba(0,0,0,0.05)' }, horzLines: { color: 'rgba(0,0,0,0.05)' } },
+      timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: true, secondsVisible: false },
+      rightPriceScale: { borderColor: 'rgba(0,0,0,0.06)' },
+    });
+    const basePrice = 23 + Math.random() * 2;
+    const intradayData = generateIntraday(basePrice);
+    const lineSer = scanChart.addLineSeries({ color: '#007AFF', lineWidth: 1.5, crosshairMarkerVisible: true });
+    lineSer.setData(intradayData);
+    scanChart.timeScale().fitContent();
+  } else {
+    const data = generateOHLCV();
+    scanChart = LightweightCharts.createChart(container, {
+      width: container.clientWidth, height: 280,
+      layout: { background: { type: 'solid', color: '#fff' }, textColor: '#86868B', fontSize: 11 },
+      grid: { vertLines: { color: 'rgba(0,0,0,0.05)' }, horzLines: { color: 'rgba(0,0,0,0.05)' } },
+      timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: false, secondsVisible: false },
+      rightPriceScale: { borderColor: 'rgba(0,0,0,0.06)' },
+    });
+    const candle = scanChart.addCandlestickSeries({ upColor: '#FF453A', downColor: '#30D158', borderUpColor: '#FF453A', borderDownColor: '#30D158', wickUpColor: '#FF453A', wickDownColor: '#30D158' });
+    candle.setData(data);
+
+    const ma5 = scanChart.addLineSeries({ color: '#FF9F0A', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+    const ma10 = scanChart.addLineSeries({ color: '#5856D6', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+    const ma20 = scanChart.addLineSeries({ color: '#34C759', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+    const ma60 = scanChart.addLineSeries({ color: '#FF3B30', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+    ma5.setData(calcMA(data, 5));
+    ma10.setData(calcMA(data, 10));
+    ma20.setData(calcMA(data, 20));
+    ma60.setData(calcMA(data, 60));
+
+    const ph = SCAN_PHASES[0];
+    const upData = data.filter(d => d.time >= ph.start && d.time <= ph.uptrendEnd).map(d => ({ time: d.time, value: d.high * 1.003 }));
+    const conData = data.filter(d => d.time > ph.uptrendEnd && d.time <= ph.consolEnd).map(d => ({ time: d.time, value: d.high * 1.003 }));
+    const upSer = scanChart.addLineSeries({ color: 'rgba(255,69,58,0.55)', lineWidth: 2, crosshairMarkerVisible: false, priceLineVisible: false });
+    const conSer = scanChart.addLineSeries({ color: 'rgba(0,122,255,0.55)', lineWidth: 2, crosshairMarkerVisible: false, priceLineVisible: false });
+    if (upData.length) upSer.setData(upData);
+    if (conData.length) conSer.setData(conData);
+
+    scanChart.timeScale().fitContent();
+  }
+}
+
+window.addEventListener('resize', () => {
+  if (window._mainChartResize) window._mainChartResize();
+  if (scanChart) scanChart.applyOptions({ width: document.getElementById('scanChart').clientWidth });
+});
+
 window.addEventListener('load', () => {
-  setTimeout(() => loadChart('603135'), 100);
+  setTimeout(() => loadMainChart('603135'), 100);
 });
 </script>
 </body>
