@@ -5,732 +5,645 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>厂字形态 · 股票分析</title>
 <style>
-  :root {
-    --accent: #0071E3; --accent-hover: #0077ED; --accent-active: #006EDB;
-    --bg: #F5F5F7; --sidebar-bg: rgba(255,255,255,0.85);
-    --card: #FFFFFF; --card-border: rgba(0,0,0,0.06);
-    --text-primary: #1D1D1F; --text-secondary: #86868B; --text-tertiary: #BFBFBF;
-    --divider: rgba(0,0,0,0.06);
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
-    --shadow-md: 0 4px 20px rgba(0,0,0,0.06);
-    --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
-    --sidebar-width: 200px;
-    --green: #34C759; --orange: #FF9500; --red: #FF3B30; --purple: #AF52DE;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
-                 'Helvetica Neue', 'PingFang SC', sans-serif;
-    background: var(--bg); color: var(--text-primary); line-height: 1.5;
-    -webkit-font-smoothing: antialiased; display: flex; min-height: 100vh;
-  }
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
-  /* Sidebar */
-  .sidebar {
-    position: fixed; top: 0; left: 0; width: var(--sidebar-width); height: 100vh;
-    background: var(--sidebar-bg); backdrop-filter: blur(40px) saturate(1.4);
-    -webkit-backdrop-filter: blur(40px) saturate(1.4);
-    border-right: 1px solid var(--divider);
-    display: flex; flex-direction: column; z-index: 100; user-select: none;
-  }
-  .sidebar-brand { padding: 24px 16px 18px; border-bottom: 1px solid var(--divider); }
-  .sidebar-brand h1 { font-size: 14px; font-weight: 700; letter-spacing: -0.1px; }
-  .sidebar-brand .version { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
-  .sidebar-nav { flex: 1; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
-  .nav-item {
-    display: flex; align-items: center; gap: 9px; padding: 7px 10px;
-    border-radius: var(--radius-sm); font-size: 13px; font-weight: 500;
-    color: var(--text-secondary); cursor: pointer; transition: all 0.15s ease;
-    border: none; background: none; width: 100%; text-align: left;
-  }
-  .nav-item:hover { background: rgba(0,0,0,0.04); color: var(--text-primary); }
-  .nav-item.active { background: var(--accent); color: white; }
-  .nav-item .icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
-  .nav-item .badge {
-    margin-left: auto; background: rgba(0,0,0,0.08); font-size: 10px; font-weight: 600;
-    padding: 1px 7px; border-radius: 10px; color: var(--text-secondary);
-  }
-  .nav-item.active .badge { background: rgba(255,255,255,0.2); color: white; }
-  .sidebar-footer { padding: 12px 16px 16px; border-top: 1px solid var(--divider); }
-  .sidebar-footer .status { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
-  .sidebar-footer .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+:root {
+  --accent: #0071E3;
+  --accent-hover: #0077ED;
+  --accent-active: #006EDB;
+  --bg: #F5F5F7;
+  --card: #FFFFFF;
+  --card-border: rgba(0,0,0,0.06);
+  --text-primary: #1D1D1F;
+  --text-secondary: #86868B;
+  --text-tertiary: #BFBFBF;
+  --divider: rgba(0,0,0,0.06);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 20px rgba(0,0,0,0.06);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --green: #34C759;
+  --orange: #FF9500;
+  --red: #FF3B30;
+}
 
-  /* Main */
-  .main { margin-left: var(--sidebar-width); flex: 1; padding: 0; min-height: 100vh; }
-  .page { display: none; padding: 28px 36px 60px; max-width: 960px; animation: fadeIn 0.2s ease; }
-  .page.active { display: block; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-  .page-header { margin-bottom: 22px; }
-  .page-title { font-size: 26px; font-weight: 700; letter-spacing: -0.3px; }
-  .page-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+               'Helvetica Neue', 'PingFang SC', sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+}
 
-  /* Stat Grid */
-  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
-  .stat-card { background: var(--card); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--card-border); padding: 16px 20px; }
-  .stat-n { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
-  .stat-n.accent { color: var(--accent); }
-  .stat-n.green  { color: var(--green); }
-  .stat-n.orange { color: var(--orange); }
-  .stat-n.purple { color: var(--purple); }
-  .stat-n.red    { color: var(--red); }
-  .stat-l { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+/* Sidebar */
+.sidebar {
+  width: 220px;
+  height: 100vh;
+  background: var(--card);
+  border-right: 1px solid var(--divider);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+}
 
-  /* Section */
-  .section { margin-bottom: 20px; }
-  .section-title { font-size: 15px; font-weight: 700; letter-spacing: -0.1px; margin-bottom: 12px; }
+.sidebar-brand {
+  padding: 24px 18px;
+  border-bottom: 1px solid var(--divider);
+}
 
-  /* Action Card: 操作+结果 合并在同一卡片，左右布局 */
-  .action-card { background: var(--card); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--card-border); overflow: hidden; }
-  .action-card-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 18px; border-bottom: 1px solid var(--divider); background: rgba(0,0,0,0.01);
-  }
-  .action-card-title { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-  .action-card-body { display: grid; grid-template-columns: 320px 1fr; }
-  .action-left { padding: 16px 18px; border-right: 1px solid var(--divider); }
-  .action-right { padding: 16px 18px; min-height: 340px; display: flex; flex-direction: column; }
+.sidebar-brand h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.1px; }
+.sidebar-brand .version { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
 
-  /* Form */
-  .form-row  { display: grid; grid-template-columns: 1fr 1fr;   gap: 10px; margin-bottom: 10px; }
-  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-  .form-group { display: flex; flex-direction: column; gap: 4px; }
-  .form-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
-  .form-label .hint { font-weight: 400; text-transform: none; color: var(--text-tertiary); margin-left: 3px; }
-  .form-input, .form-select {
-    width: 100%; padding: 8px 12px; font-size: 13px; font-family: inherit;
-    border: 1.5px solid var(--divider); border-radius: var(--radius-sm);
-    background: rgba(0,0,0,0.02); color: var(--text-primary); outline: none; transition: all 0.15s ease; appearance: none;
-  }
-  .form-input:focus, .form-select:focus {
-    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,0.12); background: white;
-  }
-  .form-input::placeholder { color: var(--text-tertiary); }
-  .form-select {
-    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2386868B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 10px center; padding-right: 32px;
-  }
+.sidebar-nav {
+  padding: 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
-  /* Inline Settings: 直接嵌在左侧操作区 */
-  .inline-settings {
-    padding: 10px 14px; background: rgba(0,113,227,0.03);
-    border: 1px solid rgba(0,113,227,0.08); border-radius: var(--radius-sm); margin-bottom: 12px;
-  }
-  .inline-settings-title { font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; }
-  .inline-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
-  .inline-row:last-child { margin-bottom: 0; }
-  .inline-row label { font-size: 11px; color: var(--text-secondary); white-space: nowrap; min-width: 64px; }
-  .inline-row input[type="number"] {
-    width: 72px; padding: 4px 8px; font-size: 12px; font-family: inherit;
-    border: 1.5px solid var(--divider); border-radius: 5px; text-align: right; outline: none;
-  }
-  .inline-row input:focus { border-color: var(--accent); }
-  .inline-row span.unit { font-size: 11px; color: var(--text-tertiary); }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
 
-  /* Toggle */
-  .form-toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; cursor: pointer; }
-  .form-toggle input { display: none; }
-  .toggle-track {
-    width: 36px; height: 20px; background: #E8E8ED; border-radius: 10px;
-    position: relative; transition: all 0.2s; flex-shrink: 0;
-  }
-  .toggle-track::after {
-    content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
-    background: white; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.15); transition: all 0.2s;
-  }
-  .form-toggle input:checked + .toggle-track { background: var(--accent); }
-  .form-toggle input:checked + .toggle-track::after { left: 18px; }
-  .toggle-label { font-size: 12px; color: var(--text-secondary); }
+.nav-item:hover { background: rgba(0,0,0,0.04); color: var(--text-primary); }
+.nav-item.active { background: var(--accent); color: white; }
 
-  /* Buttons */
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-    padding: 7px 16px; font-size: 13px; font-weight: 500; font-family: inherit;
-    border-radius: var(--radius-sm); border: none; cursor: pointer;
-    transition: all 0.15s ease; text-decoration: none; line-height: 1.4;
-  }
-  .btn-primary { background: var(--accent); color: white; box-shadow: 0 1px 3px rgba(0,113,227,0.2); }
-  .btn-primary:hover { background: var(--accent-hover); box-shadow: 0 2px 8px rgba(0,113,227,0.3); transform: translateY(-1px); }
-  .btn-primary:active { background: var(--accent-active); transform: none; }
-  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-  .btn-secondary { background: rgba(0,0,0,0.05); color: var(--text-primary); }
-  .btn-secondary:hover { background: rgba(0,0,0,0.09); }
-  .btn-danger { background: var(--red); color: white; }
-  .btn-lg { padding: 10px 24px; font-size: 14px; border-radius: var(--radius-md); }
-  .btn-group { display: flex; gap: 6px; margin-top: 12px; }
+.nav-item .icon {
+  font-size: 15px;
+  width: 22px;
+  text-align: center;
+}
 
-  /* Tags */
-  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 10px; }
-  .tag-blue   { background: rgba(0,113,227,0.1);  color: var(--accent); }
-  .tag-green  { background: rgba(52,199,89,0.1);  color: var(--green); }
-  .tag-orange { background: rgba(255,149,0,0.1); color: var(--orange); }
-  .tag-red    { background: rgba(255,59,48,0.1); color: var(--red); }
-  .tag-gray   { background: rgba(0,0,0,0.05);   color: var(--text-secondary); }
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 18px;
+  border-top: 1px solid var(--divider);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
 
-  /* Result header */
-  .result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .result-summary { display: flex; gap: 6px; align-items: center; }
+/* Main */
+.main {
+  flex: 1;
+  padding: 28px 36px 60px;
+  max-width: 960px;
+  animation: fadeIn 0.2s ease;
+}
 
-  /* Table */
-  .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--card-border); flex: 1; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  thead th {
-    background: rgba(0,0,0,0.02); padding: 9px 12px; text-align: left;
-    font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
-    color: var(--text-secondary); border-bottom: 1px solid var(--divider); white-space: nowrap;
-  }
-  tbody td { padding: 9px 12px; border-bottom: 1px solid var(--divider); vertical-align: middle; }
-  tbody tr:last-child td { border-bottom: none; }
-  tbody tr:hover { background: rgba(0,113,227,0.03); }
-  tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11px; }
+.page { display: none; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-  /* Score bar */
-  .score-bar-wrap { display: inline-flex; align-items: center; gap: 6px; min-width: 90px; }
-  .score-bar-track { flex: 1; height: 5px; background: #E8E8ED; border-radius: 3px; overflow: hidden; }
-  .score-bar-fill { height: 100%; border-radius: 3px; }
-  .score-text { font-size: 11px; font-weight: 600; min-width: 26px; text-align: right; }
+.page-header { margin-bottom: 18px; }
+.page-title { font-size: 24px; font-weight: 700; letter-spacing: -0.3px; }
+.page-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
 
-  /* Empty */
-  .empty-state {
-    text-align: center; padding: 48px 16px; color: var(--text-tertiary);
-    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  }
-  .empty-state .icon { font-size: 36px; margin-bottom: 10px; opacity: 0.4; }
-  .empty-state h3 { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 3px; }
-  .empty-state p { font-size: 12px; }
+/* Cards */
+.card {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--card-border);
+  overflow: hidden;
+  margin-bottom: 18px;
+}
 
-  /* Progress */
-  .progress-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-bottom: 5px; }
-  .progress-bar { height: 3px; background: #E8E8ED; border-radius: 2px; overflow: hidden; }
-  .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s ease; }
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--divider);
+  background: rgba(0,0,0,0.01);
+}
 
-  /* Log */
-  .log-panel {
-    background: rgba(0,0,0,0.02); border: 1px solid var(--divider);
-    border-radius: var(--radius-sm); padding: 10px 12px;
-    font-family: 'SF Mono', Monaco, Menlo, monospace;
-    font-size: 11px; line-height: 1.8; color: var(--text-secondary);
-    max-height: 150px; overflow-y: auto; margin-top: 10px; flex-shrink: 0;
-  }
-  .log-line { white-space: pre-wrap; }
-  .log-line.ok   { color: var(--green); }
-  .log-line.warn { color: var(--orange); }
-  .log-line.err  { color: var(--red); }
-  .log-line.bold { color: var(--text-primary); font-weight: 500; }
+.card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
 
-  /* Tabs */
-  .tabs { display: flex; gap: 0; background: rgba(0,0,0,0.04); border-radius: 6px; padding: 2px; width: fit-content; margin-bottom: 14px; }
-  .tab { padding: 5px 14px; font-size: 12px; font-weight: 500; font-family: inherit; border: none; background: none; border-radius: 5px; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
-  .tab.active { background: var(--card); color: var(--text-primary); box-shadow: var(--shadow-sm); }
-  .tab:hover:not(.active) { color: var(--text-primary); }
+.card-body { padding: 16px; }
 
-  /* Toolbar */
-  .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-  .search-box { position: relative; flex: 1; min-width: 180px; max-width: 260px; }
-  .search-box input {
-    width: 100%; padding: 7px 12px 7px 32px; font-size: 12px; font-family: inherit;
-    border: 1.5px solid var(--divider); border-radius: var(--radius-sm);
-    background: var(--card); outline: none; transition: border-color 0.15s;
-  }
-  .search-box input:focus { border-color: var(--accent); }
-  .search-box::before { content: '⌕'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; color: var(--text-tertiary); }
+/* Form */
+.form-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-end; }
+.form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+.form-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
+.form-input, .form-select {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1.5px solid var(--divider);
+  border-radius: var(--radius-sm);
+  background: rgba(0,0,0,0.02);
+  color: var(--text-primary);
+  outline: none;
+  transition: all 0.15s ease;
+  appearance: none;
+}
+.form-input:focus, .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,0.12); background: white; }
+.form-select {
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2386868B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
 
-  /* Status pills */
-  .status-bar { display: flex; gap: 6px; flex-wrap: wrap; }
-  .status-pill {
-    display: flex; align-items: center; gap: 5px; padding: 4px 12px;
-    background: rgba(0,0,0,0.04); border-radius: 12px;
-    font-size: 11px; font-weight: 500; color: var(--text-secondary);
-    cursor: pointer; transition: all 0.15s; border: none;
-  }
-  .status-pill:hover { background: rgba(0,0,0,0.08); }
-  .status-pill.active { background: var(--accent); color: white; }
-  .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+.btn-primary { background: var(--accent); color: white; box-shadow: 0 1px 3px rgba(0,113,227,0.2); }
+.btn-primary:hover { background: var(--accent-hover); box-shadow: 0 2px 8px rgba(0,113,227,0.3); transform: translateY(-1px); }
+.btn-primary:active { background: var(--accent-active); transform: none; }
+.btn-secondary { background: rgba(0,0,0,0.05); color: var(--text-primary); }
+.btn-secondary:hover { background: rgba(0,0,0,0.09); }
 
-  /* Pagination */
-  .pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; font-size: 11px; color: var(--text-secondary); }
-  .pagination-btns { display: flex; gap: 4px; }
-  .btn-icon { width: 28px; height: 28px; padding: 0; border-radius: 50%; }
+.btn-group { display: flex; gap: 8px; }
 
-  /* Chart area */
-  .chart-area {
-    background: rgba(0,0,0,0.01); border: 1.5px dashed var(--divider);
-    border-radius: var(--radius-md); padding: 20px; text-align: center;
-    color: var(--text-tertiary); font-size: 12px;
-  }
-  .chart-area .title { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
+/* Tags */
+.tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 12px; }
+.tag-blue { background: rgba(0,113,227,0.1); color: var(--accent); }
+.tag-green { background: rgba(52,199,89,0.1); color: var(--green); }
+.tag-orange { background: rgba(255,149,0,0.1); color: var(--orange); }
+.tag-red { background: rgba(255,59,48,0.1); color: var(--red); }
+.tag-gray { background: rgba(0,0,0,0.05); color: var(--text-secondary); }
 
-  /* Quick bar */
-  .quick-bar { display: flex; gap: 10px; margin-bottom: 18px; }
-  .quick-bar .btn { padding: 9px 18px; font-size: 13px; }
+/* Table */
+.table-wrap { overflow-x: auto; border-radius: var(--radius-md); border: 1px solid var(--card-border); }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead th {
+  background: rgba(0,0,0,0.02);
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--divider);
+  white-space: nowrap;
+}
+tbody td { padding: 10px 14px; border-bottom: 1px solid var(--divider); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: rgba(0,113,227,0.03); }
+tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11px; }
 
-  /* Mini stats */
-  .mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
-  .mini-stat { background: rgba(0,0,0,0.02); border-radius: 8px; padding: 10px 12px; text-align: center; }
-  .mini-stat .n { font-size: 20px; font-weight: 700; }
-  .mini-stat .l { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+/* Score bar */
+.score-bar-wrap { display: inline-flex; align-items: center; gap: 8px; min-width: 100px; }
+.score-bar-track { flex: 1; height: 6px; background: #E8E8ED; border-radius: 3px; overflow: hidden; }
+.score-bar-fill { height: 100%; border-radius: 3px; }
+.score-text { font-size: 11px; font-weight: 700; min-width: 30px; text-align: right; }
 
-  /* Bar chart */
-  .bar-chart { display: flex; align-items: flex-end; gap: 4px; height: 60px; margin-bottom: 8px; }
-  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-  .bar-col .bar { width: 100%; border-radius: 3px 3px 0 0; min-height: 3px; }
-  .bar-col .lbl { font-size: 9px; color: var(--text-tertiary); }
+/* Progress */
+.progress-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+.progress-bar { height: 4px; background: #E8E8ED; border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s ease; }
 
-  @media (max-width: 900px) {
-    .sidebar { width: 56px; }
-    .sidebar-brand h1, .sidebar-brand .version, .nav-item .label, .nav-item .badge, .sidebar-footer .status span { display: none; }
-    .sidebar-brand { padding: 18px 8px; text-align: center; }
-    .sidebar-nav { padding: 8px 4px; }
-    .nav-item { justify-content: center; padding: 9px; }
-    .main { margin-left: 56px; }
-    .page { padding: 20px 16px; }
-    .action-card-body { grid-template-columns: 1fr; }
-    .action-left { border-right: none; border-bottom: 1px solid var(--divider); }
-    .stat-grid { grid-template-columns: repeat(2, 1fr); }
-  }
+/* Log */
+.log-panel {
+  background: rgba(0,0,0,0.02);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-family: 'SF Mono', Monaco, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  max-height: 160px;
+  overflow-y: auto;
+  margin-top: 12px;
+}
+.log-line { white-space: pre-wrap; }
+.log-line.ok { color: var(--green); }
+.log-line.warn { color: var(--orange); }
+.log-line.err { color: var(--red); }
+.log-line.bold { color: var(--text-primary); font-weight: 600; }
+
+/* Chart area */
+.chart-area {
+  background: rgba(0,0,0,0.01);
+  border: 1.5px dashed var(--divider);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+.chart-area .title { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
+
+/* Quick stats */
+.quick-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+.stat { background: var(--card); border-radius: var(--radius-lg); border: 1px solid var(--card-border); padding: 14px 16px; text-align: center; }
+.stat .n { font-size: 24px; font-weight: 700; }
+.stat .l { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
+
+/* Timeline */
+.timeline { margin-top: 10px; }
+.timeline-item {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--divider);
+  margin-bottom: 10px;
+  background: rgba(0,0,0,0.01);
+}
+.timeline-item.active { border-color: rgba(0,113,227,0.3); background: rgba(0,113,227,0.04); }
+.timeline-item .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.timeline-item .left { display: flex; flex-direction: column; gap: 4px; }
+.timeline-item .date { font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+.timeline-item .meta { font-size: 12px; color: var(--text-primary); }
+
+/* Tabs (for view switching) */
+.tabs { display: flex; gap: 0; background: rgba(0,0,0,0.04); border-radius: var(--radius-md); padding: 3px; width: fit-content; margin-bottom: 14px; }
+.tab { padding: 7px 16px; font-size: 12px; font-weight: 600; font-family: inherit; border: none; background: none; border-radius: 8px; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
+.tab.active { background: var(--card); color: var(--text-primary); box-shadow: var(--shadow-sm); }
+.tab:hover:not(.active) { color: var(--text-primary); }
+
+/* Empty */
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-tertiary);
+}
+.empty .icon { font-size: 36px; margin-bottom: 10px; opacity: 0.4; }
+.empty h3 { font-size: 14px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
+.empty p { font-size: 12px; line-height: 1.6; }
+
+@media (max-width: 800px) {
+  .sidebar { width: 60px; }
+  .sidebar-brand h1, .sidebar-brand .version, .nav-item .label, .sidebar-footer { display: none; }
+  .sidebar-brand { padding: 18px 10px; text-align: center; }
+  .sidebar-nav { padding: 10px 6px; }
+  .nav-item { justify-content: center; padding: 12px; }
+  .main { padding: 20px 16px; }
+  .quick-stats { grid-template-columns: repeat(1, 1fr); }
+}
 </style>
 </head>
 <body>
 
 <!-- Sidebar -->
 <aside class="sidebar">
-  <div class="sidebar-brand"><h1>厂字形态</h1><div class="version">v1.0 · A股</div></div>
+  <div class="sidebar-brand">
+    <h1>厂字形态</h1>
+    <div class="version">v1.0 · A股</div>
+  </div>
   <nav class="sidebar-nav">
-    <button class="nav-item active" data-page="home"><span class="icon">⊞</span><span class="label">首页</span></button>
-    <button class="nav-item" data-page="scan"><span class="icon">⌕</span><span class="label">扫描</span></button>
-    <button class="nav-item" data-page="backtest"><span class="icon">↻</span><span class="label">回测</span></button>
-    <button class="nav-item" data-page="watchlist"><span class="icon">◎</span><span class="label">观察</span><span class="badge">213</span></button>
-    <button class="nav-item" data-page="reports"><span class="icon">≡</span><span class="label">报告</span></button>
+    <button class="nav-item active" data-page="stock">
+      <span class="icon">📈</span>
+      <span class="label">个股分析</span>
+    </button>
+    <button class="nav-item" data-page="scan">
+      <span class="icon">🔍</span>
+      <span class="label">大盘扫描</span>
+    </button>
   </nav>
-  <div class="sidebar-footer"><div class="status"><span class="dot"></span><span>Baostock · 正常</span></div></div>
+  <div class="sidebar-footer">
+    <strong>两个核心功能：</strong><br>
+    1. 单只股票历史阶段<br>
+    2. 全市场今日扫描
+  </div>
 </aside>
 
 <!-- Main -->
 <main class="main">
 
-<!-- ============================================= PAGE: 首页 ============================================= -->
-<section class="page active" id="page-home">
+<!-- ============================================= PAGE: 个股分析 ============================================= -->
+<section class="page active" id="page-stock">
   <div class="page-header">
-    <h2 class="page-title">仪表盘</h2>
-    <p class="page-subtitle">2026-04-29 · 上次扫描 17:22</p>
+    <h2 class="page-title">个股分析</h2>
+    <p class="page-subtitle">分析单只股票历史上所有符合「厂」字形态的阶段</p>
   </div>
 
-  <div class="stat-grid" style="margin-bottom:18px;">
-    <div class="stat-card"><div class="stat-n accent">19</div><div class="stat-l">形态匹配</div></div>
-    <div class="stat-card"><div class="stat-n green">213</div><div class="stat-l">观察中</div></div>
-    <div class="stat-card"><div class="stat-n orange">154</div><div class="stat-l">盘整观察</div></div>
-    <div class="stat-card"><div class="stat-n purple">500</div><div class="stat-l">已扫描</div></div>
-  </div>
-
-  <div class="quick-bar">
-    <button class="btn btn-primary btn-lg" onclick="navigateTo('scan')">▶ 开始扫描</button>
-    <button class="btn btn-secondary btn-lg" onclick="navigateTo('backtest')">↻ 历史回测</button>
-    <button class="btn btn-secondary btn-lg" onclick="navigateTo('watchlist')">◎ 观察列表</button>
-  </div>
-
-  <div class="section">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-      <h3 class="section-title" style="margin-bottom:0;">最近匹配</h3>
-      <button class="btn btn-secondary" style="font-size:12px; padding:4px 12px;" onclick="navigateTo('reports')">全部报告</button>
+  <!-- 股票选择 -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">选择股票</span>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>代码</th><th>名称</th><th>评分</th><th>涨幅</th><th>盘整</th><th>状态</th></tr></thead>
-        <tbody>
-          <tr><td><code>603135</code></td><td>中重科技</td><td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:85%;background:var(--accent);"></div></div><span class="score-text" style="color:var(--accent);">0.85</span></div></td><td>+15.4%</td><td>14天</td><td><span class="tag tag-green">已匹配</span></td></tr>
-          <tr><td><code>301439</code></td><td>泓淋电力</td><td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:82%;background:var(--accent);"></div></div><span class="score-text" style="color:var(--accent);">0.82</span></div></td><td>+15.3%</td><td>13天</td><td><span class="tag tag-green">已匹配</span></td></tr>
-          <tr><td><code>600831</code></td><td>广电网络</td><td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:78%;background:var(--accent);"></div></div><span class="score-text" style="color:var(--accent);">0.78</span></div></td><td>+18.5%</td><td>19天</td><td><span class="tag tag-green">已匹配</span></td></tr>
-          <tr><td><code>603012</code></td><td>创力集团</td><td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:75%;background:var(--accent);"></div></div><span class="score-text" style="color:var(--accent);">0.75</span></div></td><td>+17.2%</td><td>10天</td><td><span class="tag tag-green">已匹配</span></td></tr>
-          <tr><td><code>603020</code></td><td>爱普股份</td><td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:72%;background:var(--accent);"></div></div><span class="score-text" style="color:var(--accent);">0.72</span></div></td><td>+16.7%</td><td>18天</td><td><span class="tag tag-green">已匹配</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="section">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-      <h3 class="section-title" style="margin-bottom:0;">K 线图</h3>
-      <select class="form-select" style="width:160px; padding:5px 10px; font-size:12px;">
-        <option>603135 中重科技</option>
-        <option>301439 泓淋电力</option>
-        <option>600831 广电网络</option>
-      </select>
-    </div>
-    <div class="chart-area" style="height:200px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-      <div class="title">603135 · 中重科技 · 形态标注图</div>
-      <div style="display:flex; gap:20px; margin-top:12px; font-size:12px; color:var(--text-secondary);">
-        <span>⬆ 上涨 2025-11-04 → 2026-01-15 <strong style="color:var(--red);">+15.4%</strong></span>
-        <span>▬ 盘整 2026-01-16 → 2026-02-10 <strong>14天</strong></span>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">股票代码</label>
+          <input class="form-input" type="text" placeholder="输入代码，例如：603135" value="603135">
+        </div>
+        <div class="form-group">
+          <label class="form-label">或从最近选</label>
+          <select class="form-select">
+            <option>603135 中重科技</option>
+            <option>301439 泓淋电力</option>
+            <option>600831 广电网络</option>
+          </select>
+        </div>
+        <button class="btn btn-primary">▶ 分析</button>
       </div>
-      <div style="margin-top:16px; width:70%; height:6px; background:#E8E8ED; border-radius:3px; overflow:hidden;">
-        <div style="height:100%; width:28%; background:var(--red); float:left;"></div>
-        <div style="height:100%; width:72%; background:var(--accent); float:left;"></div>
+    </div>
+  </div>
+
+  <!-- 快速统计 -->
+  <div class="quick-stats">
+    <div class="stat">
+      <div class="n" style="color:var(--accent);">3</div>
+      <div class="l">历史匹配次数</div>
+    </div>
+    <div class="stat">
+      <div class="n" style="color:var(--green);">0.82</div>
+      <div class="l">平均评分</div>
+    </div>
+    <div class="stat">
+      <div class="n" style="color:var(--orange);">16</div>
+      <div class="l">平均盘整天</div>
+    </div>
+  </div>
+
+  <!-- K线图 + 形态标注 -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">形态标注图</span>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <span class="tag tag-green">当前已匹配</span>
       </div>
-      <div style="margin-top:6px; width:70%; display:flex; justify-content:space-between; font-size:10px; color:var(--text-tertiary);">
-        <span>↑ 上涨段</span><span>▬ 盘整段</span>
+    </div>
+    <div class="card-body">
+      <div class="chart-area" style="height:220px;">
+        <div class="title">603135 · 中重科技 · K线图</div>
+        <div style="display:flex; gap:24px; margin-top:16px; font-size:13px;">
+          <span><strong style="color:var(--red);">↑ 上涨段</strong> 2025-11-04 → 2026-01-15 (+15.4%)</span>
+          <span><strong style="color:var(--accent);">▬ 盘整段</strong> 2026-01-16 → 2026-02-10 (14天)</span>
+        </div>
+        <div style="margin-top:20px; width:80%; height:8px; background:#E8E8ED; border-radius:4px; overflow:hidden;">
+          <div style="height:100%; width:30%; background:var(--red); float:left;"></div>
+          <div style="height:100%; width:70%; background:var(--accent); float:left;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 历史阶段列表 -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">历史形态阶段</span>
+    </div>
+    <div class="card-body">
+      <div class="timeline">
+        <div class="timeline-item active">
+          <div class="row">
+            <div class="left">
+              <div class="date">2026-02-10（最新）</div>
+              <div class="meta">
+                <span class="tag tag-blue">+15.4%</span>
+                <span class="tag tag-orange">盘整14天</span>
+              </div>
+            </div>
+            <div class="right">
+              <span class="score-bar-wrap">
+                <span class="score-bar-track"><span class="score-bar-fill" style="width:85%; background:var(--accent);"></span></span>
+                <span class="score-text" style="color:var(--accent);">0.85</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div class="row">
+            <div class="left">
+              <div class="date">2025-09-03</div>
+              <div class="meta">
+                <span class="tag tag-blue">+15.3%</span>
+                <span class="tag tag-orange">盘整13天</span>
+              </div>
+            </div>
+            <div class="right">
+              <span class="score-bar-wrap">
+                <span class="score-bar-track"><span class="score-bar-fill" style="width:82%; background:var(--accent);"></span></span>
+                <span class="score-text" style="color:var(--accent);">0.82</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div class="row">
+            <div class="left">
+              <div class="date">2025-08-12</div>
+              <div class="meta">
+                <span class="tag tag-blue">+18.5%</span>
+                <span class="tag tag-orange">盘整19天</span>
+              </div>
+            </div>
+            <div class="right">
+              <span class="score-bar-wrap">
+                <span class="score-bar-track"><span class="score-bar-fill" style="width:78%; background:var(--accent);"></span></span>
+                <span class="score-text" style="color:var(--accent);">0.78</span>
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============================================= PAGE: 扫描 ============================================= -->
+<!-- ============================================= PAGE: 大盘扫描 ============================================= -->
 <section class="page" id="page-scan">
   <div class="page-header">
-    <h2 class="page-title">实时扫描</h2>
-    <p class="page-subtitle">全市场 A 股「厂」字形态识别</p>
+    <h2 class="page-title">大盘扫描</h2>
+    <p class="page-subtitle">找到截止今天全市场符合「厂」字形态的股票</p>
   </div>
 
-  <div class="action-card">
-    <div class="action-card-header">
-      <span class="action-card-title">扫描配置</span>
-      <div style="display:flex; gap:5px; align-items:center;">
-        <span style="font-size:11px; color:var(--text-secondary);">使用中</span>
+  <!-- 扫描配置 -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">扫描配置</span>
+      <div style="display:flex; gap:6px;">
         <span class="tag tag-gray">涨幅≥15%</span>
         <span class="tag tag-gray">盘整10~40天</span>
       </div>
     </div>
-
-    <div class="action-card-body">
-      <!-- 左侧：参数 + 操作 -->
-      <div class="action-left">
-        <div class="form-row-3">
-          <div class="form-group">
-            <label class="form-label">模式</label>
-            <select class="form-select">
-              <option value="inc">增量扫描</option>
-              <option value="full">全量扫描</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">并行</label>
-            <select class="form-select">
-              <option>2</option><option selected>3</option><option>4</option><option>6</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">上限 <span class="hint">0=不限</span></label>
-            <input class="form-input" type="number" value="0" min="0">
-          </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">模式</label>
+          <select class="form-select">
+            <option>增量扫描（推荐）</option>
+            <option>全量扫描</option>
+          </select>
         </div>
-
-        <!-- 关键参数，直接嵌在操作区 -->
-        <div class="inline-settings">
-          <div class="inline-settings-title">形态参数</div>
-          <div class="inline-row">
-            <label>上涨涨幅</label>
-            <input type="number" value="15" min="5" max="50" step="1">
-            <span class="unit">%</span>
-          </div>
-          <div class="inline-row">
-            <label>盘整天数</label>
-            <input type="number" value="10" min="5" max="30" step="1">
-            <span class="unit">~</span>
-            <input type="number" value="40" min="20" max="120" step="5" style="width:68px;">
-            <span class="unit">天</span>
-          </div>
-          <div class="inline-row">
-            <label>布林带宽</label>
-            <input type="number" value="0.20" min="0.05" max="0.50" step="0.01">
-          </div>
+        <div class="form-group">
+          <label class="form-label">并行</label>
+          <select class="form-select">
+            <option>2</option>
+            <option selected>3</option>
+            <option>4</option>
+          </select>
         </div>
-
-        <div class="form-toggle">
-          <input type="checkbox" id="scan-auto-report" checked>
-          <label class="toggle-track" for="scan-auto-report"></label>
-          <span class="toggle-label">完成后自动生成报告</span>
-        </div>
-
-        <div class="btn-group">
-          <button class="btn btn-primary btn-lg" style="flex:1;">▶ 开始扫描</button>
-          <button class="btn btn-secondary">⏹ 停止</button>
+        <div class="form-group">
+          <label class="form-label">数量上限（0=不限）</label>
+          <input class="form-input" type="number" value="0" min="0">
         </div>
       </div>
 
-      <!-- 右侧：进度 + 结果 -->
-      <div class="action-right">
-        <div class="result-header">
-          <div class="result-summary">
-            <span class="tag tag-green">19 匹配</span>
-            <span class="tag tag-orange">154 观察</span>
-            <span class="tag tag-gray">287 无形态</span>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">上涨涨幅</label>
+          <input class="form-input" type="number" value="15" min="5" max="50">
+        </div>
+        <div class="form-group">
+          <label class="form-label">盘整天数</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input class="form-input" type="number" value="10" min="5" max="30" style="flex:1;">
+            <span style="color:var(--text-tertiary);">~</span>
+            <input class="form-input" type="number" value="40" min="20" max="120" style="flex:1;">
           </div>
-          <button class="btn btn-secondary" style="padding:4px 10px; font-size:11px;">导出 CSV</button>
         </div>
-
-        <div class="progress-meta"><span>扫描完成</span><span>500 / 500</span></div>
-        <div class="progress-bar"><div class="progress-fill" style="width:100%;"></div></div>
-
-        <div class="log-panel">
-          <div class="log-line ok">[17:22:01] ✓ 扫描开始</div>
-          <div class="log-line">[17:22:02]   加载股票列表: 5318 只</div>
-          <div class="log-line">[17:22:03]   过滤 ST 股: 跳过 23 只</div>
-          <div class="log-line bold">[17:22:04] ⌕ 000001 平安银行</div>
-          <div class="log-line bold">[17:22:04] ⌕ 000002 万科A</div>
-          <div class="log-line warn">[17:22:05]   → 600054 黄山旅游 [盘整观察] score=0.95</div>
-          <div class="log-line ok">[17:22:06]   ✓ 603135 中重科技 [已匹配] score=0.85</div>
-          <div class="log-line bold">[17:22:07] ⌕ 601398 工商银行</div>
-          <div class="log-line warn">[17:22:08]   → 600188 兖矿能源 [盘整观察] score=0.91</div>
-          <div class="log-line ok">[17:22:42] ✓ 扫描完成 · 500只 · 19匹配 · 耗时 41s</div>
+        <div class="form-group">
+          <label class="form-label">布林带宽</label>
+          <input class="form-input" type="number" value="0.20" step="0.01">
         </div>
+      </div>
 
-        <div class="table-wrap" style="margin-top:10px; max-height:180px; overflow-y:auto;">
-          <table>
-            <thead><tr><th>代码</th><th>名称</th><th>评分</th><th>涨幅</th><th>盘整</th><th>状态</th></tr></thead>
-            <tbody>
-              <tr><td><code>603135</code></td><td>中重科技</td><td><span class="score-text" style="color:var(--accent);">0.85</span></td><td>+15.4%</td><td>14天</td><td><span class="tag tag-green">已匹配</span></td></tr>
-              <tr><td><code>301439</code></td><td>泓淋电力</td><td><span class="score-text" style="color:var(--accent);">0.82</span></td><td>+15.3%</td><td>13天</td><td><span class="tag tag-green">已匹配</span></td></tr>
-              <tr><td><code>600831</code></td><td>广电网络</td><td><span class="score-text" style="color:var(--accent);">0.78</span></td><td>+18.5%</td><td>19天</td><td><span class="tag tag-green">已匹配</span></td></tr>
-              <tr><td><code>600054</code></td><td>黄山旅游</td><td><span class="score-text" style="color:var(--orange);">0.95</span></td><td>+26.3%</td><td>52天</td><td><span class="tag tag-orange">盘整中</span></td></tr>
-              <tr><td><code>600188</code></td><td>兖矿能源</td><td><span class="score-text" style="color:var(--orange);">0.91</span></td><td>+60.3%</td><td>33天</td><td><span class="tag tag-orange">盘整中</span></td></tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="btn-group" style="margin-top:6px;">
+        <button class="btn btn-primary" style="flex:1;">▶ 开始扫描</button>
+        <button class="btn btn-secondary">⏹ 停止</button>
       </div>
     </div>
   </div>
-</section>
 
-<!-- ============================================= PAGE: 回测 ============================================= -->
-<section class="page" id="page-backtest">
-  <div class="page-header">
-    <h2 class="page-title">历史回测</h2>
-    <p class="page-subtitle">验证「厂」字形态在某时间段的出现频率和分布</p>
-  </div>
-
-  <div class="action-card">
-    <div class="action-card-header">
-      <span class="action-card-title">回测参数</span>
-      <div style="display:flex; gap:5px; align-items:center;">
-        <span style="font-size:11px; color:var(--text-secondary);">使用中</span>
-        <span class="tag tag-gray">涨幅≥15%</span>
-        <span class="tag tag-gray">盘整10~40天</span>
+  <!-- 扫描结果 -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">扫描结果</span>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <span class="tag tag-green">19 已匹配</span>
+        <span class="tag tag-orange">154 观察中</span>
+        <button class="btn btn-secondary" style="padding:5px 12px; font-size:12px;">导出 CSV</button>
       </div>
     </div>
+    <div class="card-body">
+      <div class="progress-meta"><span>扫描进度</span><span>500 / 500</span></div>
+      <div class="progress-bar"><div class="progress-fill" style="width:100%;"></div></div>
 
-    <div class="action-card-body">
-      <!-- 左侧：参数 -->
-      <div class="action-left">
-        <div class="form-row-3">
-          <div class="form-group">
-            <label class="form-label">起始日期</label>
-            <input class="form-input" type="date" value="2025-06-01">
-          </div>
-          <div class="form-group">
-            <label class="form-label">结束日期</label>
-            <input class="form-input" type="date" value="2026-04-29">
-          </div>
-          <div class="form-group">
-            <label class="form-label">检查步长</label>
-            <select class="form-select">
-              <option>每3交易日</option>
-              <option selected>每5交易日</option>
-              <option>每10交易日</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">股票范围</label>
-            <select class="form-select">
-              <option value="auto" selected>全市场</option>
-              <option value="codes">指定代码</option>
-              <option value="from-file">从报告导入</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">数量上限 <span class="hint">0=不限</span></label>
-            <input class="form-input" type="number" value="200" min="0">
-          </div>
-        </div>
-
-        <!-- 关键参数 -->
-        <div class="inline-settings">
-          <div class="inline-settings-title">形态参数</div>
-          <div class="inline-row">
-            <label>上涨涨幅</label>
-            <input type="number" value="15" min="5" max="50" step="1">
-            <span class="unit">%</span>
-          </div>
-          <div class="inline-row">
-            <label>盘整天数</label>
-            <input type="number" value="10" min="5" max="30" step="1">
-            <span class="unit">~</span>
-            <input type="number" value="40" min="20" max="120" step="5" style="width:68px;">
-            <span class="unit">天</span>
-          </div>
-        </div>
-
-        <div class="btn-group">
-          <button class="btn btn-primary btn-lg" style="flex:1;">▶ 开始回测</button>
-          <button class="btn btn-secondary">重置</button>
-        </div>
+      <div class="log-panel">
+        <div class="log-line ok">[17:22:01] ✓ 扫描开始</div>
+        <div class="log-line">[17:22:02]   加载股票列表: 5318 只</div>
+        <div class="log-line">[17:22:03]   过滤 ST 股: 跳过 23 只</div>
+        <div class="log-line bold">[17:22:04] ⌕ 000001 平安银行</div>
+        <div class="log-line ok">[17:22:06] ✓ 603135 中重科技 [匹配] score=0.85</div>
+        <div class="log-line warn">[17:22:08] → 600188 兖矿能源 [观察] score=0.91</div>
+        <div class="log-line ok">[17:22:42] ✓ 扫描完成 · 500只 · 19匹配 · 耗时 41s</div>
       </div>
 
-      <!-- 右侧：结果 -->
-      <div class="action-right">
-        <div class="result-header">
-          <div class="result-summary">
-            <span class="tag tag-blue">累计匹配 47 次</span>
-            <span class="tag tag-blue">涉及 31 只股票</span>
-          </div>
-          <button class="btn btn-secondary" style="padding:4px 10px; font-size:11px;">导出</button>
-        </div>
-
-        <!-- 迷你统计 -->
-        <div class="mini-stats">
-          <div class="mini-stat"><div class="n" style="color:var(--accent);">47</div><div class="l">形态次数</div></div>
-          <div class="mini-stat"><div class="n" style="color:var(--green);">31</div><div class="l">涉及股票</div></div>
-          <div class="mini-stat"><div class="n" style="color:var(--orange);">15</div><div class="l">平均盘整天</div></div>
-        </div>
-
-        <!-- 月度分布柱状图 -->
-        <div style="margin-bottom:10px;">
-          <div style="font-size:10px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">月度分布</div>
-          <div class="bar-chart">
-            <div class="bar-col"><div class="bar" style="height:20px; background:var(--accent);"></div><div class="lbl">6月</div></div>
-            <div class="bar-col"><div class="bar" style="height:40px; background:var(--accent);"></div><div class="lbl">7月</div></div>
-            <div class="bar-col"><div class="bar" style="height:55px; background:var(--accent);"></div><div class="lbl">8月</div></div>
-            <div class="bar-col"><div class="bar" style="height:35px; background:var(--accent);"></div><div class="lbl">9月</div></div>
-            <div class="bar-col"><div class="bar" style="height:60px; background:var(--accent);"></div><div class="lbl">10月</div></div>
-            <div class="bar-col"><div class="bar" style="height:48px; background:var(--accent);"></div><div class="lbl">11月</div></div>
-            <div class="bar-col"><div class="bar" style="height:25px; background:var(--accent);"></div><div class="lbl">12月</div></div>
-            <div class="bar-col"><div class="bar" style="height:30px; background:var(--accent);"></div><div class="lbl">1月</div></div>
-            <div class="bar-col"><div class="bar" style="height:15px; background:var(--accent);"></div><div class="lbl">2月</div></div>
-            <div class="bar-col"><div class="bar" style="height:10px; background:var(--accent);"></div><div class="lbl">3月</div></div>
-            <div class="bar-col"><div class="bar" style="height:5px; background:var(--text-tertiary);"></div><div class="lbl">4月</div></div>
-          </div>
-        </div>
-
-        <div class="table-wrap" style="max-height:160px; overflow-y:auto;">
-          <table>
-            <thead><tr><th>日期</th><th>代码</th><th>名称</th><th>涨幅</th><th>盘整</th><th>评分</th></tr></thead>
-            <tbody>
-              <tr><td style="white-space:nowrap;">2025-08-12</td><td><code>603135</code></td><td>中重科技</td><td>+15.4%</td><td>14天</td><td><span class="score-text" style="color:var(--accent);">0.85</span></td></tr>
-              <tr><td style="white-space:nowrap;">2025-09-03</td><td><code>301439</code></td><td>泓淋电力</td><td>+15.3%</td><td>13天</td><td><span class="score-text" style="color:var(--accent);">0.82</span></td></tr>
-              <tr><td style="white-space:nowrap;">2025-10-21</td><td><code>600831</code></td><td>广电网络</td><td>+18.5%</td><td>19天</td><td><span class="score-text" style="color:var(--accent);">0.78</span></td></tr>
-              <tr><td style="white-space:nowrap;">2025-11-05</td><td><code>603012</code></td><td>创力集团</td><td>+17.2%</td><td>10天</td><td><span class="score-text" style="color:var(--accent);">0.75</span></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============================================= PAGE: 观察列表 ============================================= -->
-<section class="page" id="page-watchlist">
-  <div class="page-header">
-    <h2 class="page-title">观察列表</h2>
-    <p class="page-subtitle">接近「厂」字形态的候选股票，持续跟踪</p>
-  </div>
-
-  <div class="toolbar">
-    <div class="status-bar">
-      <button class="status-pill active"><span class="dot" style="background:var(--accent);"></span>全部 <strong>213</strong></button>
-      <button class="status-pill"><span class="dot" style="background:var(--accent);"></span>盘整中 <strong>154</strong></button>
-      <button class="status-pill"><span class="dot" style="background:var(--orange);"></span>上涨中 <strong>59</strong></button>
-    </div>
-    <div class="search-box"><input type="text" placeholder="搜索股票代码或名称..."></div>
-    <button class="btn btn-secondary" style="font-size:12px; padding:5px 12px;">导出</button>
-  </div>
-
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th style="width:24px;">#</th><th>代码</th><th>名称</th><th>状态</th><th style="min-width:100px;">评分</th><th>涨幅</th><th>盘整天数</th><th>备注</th></tr></thead>
-      <tbody>
-        <tr><td style="color:var(--text-tertiary);">1</td><td><code>600054</code></td><td>黄山旅游</td><td><span class="tag tag-blue">盘整中</span></td><td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:95%;background:var(--accent);"></div></div><span class="score-text" style="color:var(--accent);">0.95</span></div></td><td style="color:var(--red);">+26.3%</td><td>52天</td><td style="font-size:11px; color:var(--text-secondary);">涨幅满足·盘整52天(偏长)</td></tr>
-        <tr><td style="color:var(--text-tertiary);">2</td><td><code>600287</code></td><td>苏豪时尚</td><td><span class="tag tag-blue">盘整中</span></td><td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:95%;background:var(--accent);"></div></div><span class="score-text" style="color:var(--accent);">0.95</span></div></td><td style="color:var(--red);">+16.3%</td><td>199天</td><td style="font-size:11px; color:var(--text-secondary);">涨幅满足·盘整过长</td></tr>
-        <tr><td style="color:var(--text-tertiary);">3</td><td><code>600329</code></td><td>达仁堂</td><td><span class="tag tag-blue">盘整中</span></td><td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:95%;background:var(--accent);"></div></div><span class="score-text" style="color:var(--accent);">0.95</span></div></td><td style="color:var(--red);">+46.9%</td><td>167天</td><td style="font-size:11px; color:var(--text-secondary);">涨幅满足·盘整过长</td></tr>
-        <tr><td style="color:var(--text-tertiary);">4</td><td><code>600188</code></td><td>兖矿能源</td><td><span class="tag tag-blue">盘整中</span></td><td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:91%;background:var(--accent);"></div></div><span class="score-text" style="color:var(--accent);">0.91</span></div></td><td style="color:var(--red);">+60.3%</td><td>33天</td><td style="font-size:11px; color:var(--text-secondary);">涨幅满足·盘整接近上限</td></tr>
-        <tr><td style="color:var(--text-tertiary);">5</td><td><code>600066</code></td><td>宇通客车</td><td><span class="tag tag-blue">盘整中</span></td><td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:80%;background:var(--orange);"></div></div><span class="score-text" style="color:var(--orange);">0.80</span></div></td><td style="color:var(--red);">+18.9%</td><td>18天</td><td style="font-size:11px; color:var(--text-secondary);">涨幅满足·盘整中</td></tr>
-        <tr><td style="color:var(--text-tertiary);">6</td><td><code>600186</code></td><td>莲花控股</td><td><span class="tag tag-orange">上涨中</span></td><td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:80%;background:var(--orange);"></div></div><span class="score-text" style="color:var(--orange);">0.73</span></div></td><td style="color:var(--red);">+55.9%</td><td>—</td><td style="font-size:11px; color:var(--text-secondary);">涨幅满足·等待盘整</td></tr>
-        <tr><td style="color:var(--text-tertiary);">7</td><td><code>600058</code></td><td>五矿发展</td><td><span class="tag tag-blue">盘整中</span></td><td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:70%;background:var(--orange);"></div></div><span class="score-text" style="color:var(--orange);">0.70</span></div></td><td style="color:var(--red);">+61.2%</td><td>58天</td><td style="font-size:11px; color:var(--text-secondary);">涨幅满足·盘整偏长</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="pagination">
-    <span>显示 1-7 / 共 213 只</span>
-    <div class="pagination-btns">
-      <button class="btn btn-secondary btn-icon" disabled>‹</button>
-      <button class="btn btn-primary" style="min-width:28px; padding:3px 8px; font-size:11px;">1</button>
-      <button class="btn btn-secondary" style="min-width:28px; padding:3px 8px; font-size:11px;">2</button>
-      <button class="btn btn-secondary" style="min-width:28px; padding:3px 8px; font-size:11px;">3</button>
-      <span style="padding:0 4px; color:var(--text-tertiary); font-size:11px;">...</span>
-      <button class="btn btn-secondary" style="min-width:28px; padding:3px 8px; font-size:11px;">31</button>
-      <button class="btn btn-secondary btn-icon">›</button>
-    </div>
-  </div>
-</section>
-
-<!-- ============================================= PAGE: 报告 ============================================= -->
-<section class="page" id="page-reports">
-  <div class="page-header">
-    <h2 class="page-title">历史报告</h2>
-    <p class="page-subtitle">已生成的扫描报告，包含 K 线图与形态标注</p>
-  </div>
-
-  <div class="table-wrap" style="margin-bottom:20px;">
-    <table>
-      <thead><tr><th>报告文件</th><th>生成时间</th><th>匹配</th><th>观察</th><th>操作</th></tr></thead>
-      <tbody>
-        <tr>
-          <td><code>patterns_20260429_171411</code></td>
-          <td style="color:var(--text-secondary);">2026-04-29 17:14</td>
-          <td><span class="tag tag-green">19 只</span></td>
-          <td><span class="tag tag-orange">154 只</span></td>
-          <td><div style="display:flex; gap:5px;"><button class="btn btn-primary" style="padding:4px 12px; font-size:11px;">预览</button><button class="btn btn-secondary" style="padding:4px 12px; font-size:11px;">JSON</button><button class="btn btn-danger" style="padding:4px 12px; font-size:11px;">删除</button></div></td>
-        </tr>
-        <tr>
-          <td><code>patterns_20260422_091503</code></td>
-          <td style="color:var(--text-secondary);">2026-04-22 09:15</td>
-          <td><span class="tag tag-green">7 只</span></td>
-          <td><span class="tag tag-orange">89 只</span></td>
-          <td><div style="display:flex; gap:5px;"><button class="btn btn-secondary" style="padding:4px 12px; font-size:11px;">预览</button><button class="btn btn-secondary" style="padding:4px 12px; font-size:11px;">JSON</button><button class="btn btn-danger" style="padding:4px 12px; font-size:11px;">删除</button></div></td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- K线图网格 -->
-  <div class="section">
-    <h3 class="section-title">K 线图总览</h3>
-    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px;">
-      <div class="chart-area" style="height:130px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px;">
-        <div style="font-size:12px; font-weight:600;">603135</div>
-        <div style="font-size:11px; color:var(--text-secondary);">中重科技</div>
-        <div style="font-size:11px; color:var(--green); margin-top:4px;">+15.4% · 14天</div>
-        <div style="width:80%; height:24px; background:#E8E8ED; border-radius:3px; margin-top:8px; overflow:hidden; display:flex;">
-          <div style="height:100%; width:30%; background:var(--red);"></div>
-          <div style="height:100%; width:70%; background:var(--accent);"></div>
-        </div>
-      </div>
-      <div class="chart-area" style="height:130px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px;">
-        <div style="font-size:12px; font-weight:600;">301439</div>
-        <div style="font-size:11px; color:var(--text-secondary);">泓淋电力</div>
-        <div style="font-size:11px; color:var(--green); margin-top:4px;">+15.3% · 13天</div>
-        <div style="width:80%; height:24px; background:#E8E8ED; border-radius:3px; margin-top:8px; overflow:hidden; display:flex;">
-          <div style="height:100%; width:28%; background:var(--red);"></div>
-          <div style="height:100%; width:72%; background:var(--accent);"></div>
-        </div>
-      </div>
-      <div class="chart-area" style="height:130px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px;">
-        <div style="font-size:12px; font-weight:600;">600831</div>
-        <div style="font-size:11px; color:var(--text-secondary);">广电网络</div>
-        <div style="font-size:11px; color:var(--green); margin-top:4px;">+18.5% · 19天</div>
-        <div style="width:80%; height:24px; background:#E8E8ED; border-radius:3px; margin-top:8px; overflow:hidden; display:flex;">
-          <div style="height:100%; width:35%; background:var(--red);"></div>
-          <div style="height:100%; width:65%; background:var(--accent);"></div>
-        </div>
-      </div>
-      <div class="chart-area" style="height:130px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px;">
-        <div style="font-size:12px; font-weight:600;">603012</div>
-        <div style="font-size:11px; color:var(--text-secondary);">创力集团</div>
-        <div style="font-size:11px; color:var(--green); margin-top:4px;">+17.2% · 10天</div>
-        <div style="width:80%; height:24px; background:#E8E8ED; border-radius:3px; margin-top:8px; overflow:hidden; display:flex;">
-          <div style="height:100%; width:40%; background:var(--red);"></div>
-          <div style="height:100%; width:60%; background:var(--accent);"></div>
-        </div>
+      <div class="table-wrap" style="margin-top:12px;">
+        <table>
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th style="min-width:120px;">评分</th>
+              <th>涨幅</th>
+              <th>盘整</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>603135</code></td>
+              <td>中重科技</td>
+              <td>
+                <span class="score-bar-wrap">
+                  <span class="score-bar-track"><span class="score-bar-fill" style="width:85%; background:var(--accent);"></span></span>
+                  <span class="score-text" style="color:var(--accent);">0.85</span>
+                </span>
+              </td>
+              <td style="color:var(--red);">+15.4%</td>
+              <td>14天</td>
+              <td><span class="tag tag-green">已匹配</span></td>
+            </tr>
+            <tr>
+              <td><code>301439</code></td>
+              <td>泓淋电力</td>
+              <td>
+                <span class="score-bar-wrap">
+                  <span class="score-bar-track"><span class="score-bar-fill" style="width:82%; background:var(--accent);"></span></span>
+                  <span class="score-text" style="color:var(--accent);">0.82</span>
+                </span>
+              </td>
+              <td style="color:var(--red);">+15.3%</td>
+              <td>13天</td>
+              <td><span class="tag tag-green">已匹配</span></td>
+            </tr>
+            <tr>
+              <td><code>600831</code></td>
+              <td>广电网络</td>
+              <td>
+                <span class="score-bar-wrap">
+                  <span class="score-bar-track"><span class="score-bar-fill" style="width:78%; background:var(--accent);"></span></span>
+                  <span class="score-text" style="color:var(--accent);">0.78</span>
+                </span>
+              </td>
+              <td style="color:var(--red);">+18.5%</td>
+              <td>19天</td>
+              <td><span class="tag tag-green">已匹配</span></td>
+            </tr>
+            <tr>
+              <td><code>600054</code></td>
+              <td>黄山旅游</td>
+              <td>
+                <span class="score-bar-wrap">
+                  <span class="score-bar-track"><span class="score-bar-fill" style="width:95%; background:var(--orange);"></span></span>
+                  <span class="score-text" style="color:var(--orange);">0.95</span>
+                </span>
+              </td>
+              <td style="color:var(--red);">+26.3%</td>
+              <td>52天</td>
+              <td><span class="tag tag-orange">观察中</span></td>
+            </tr>
+            <tr>
+              <td><code>600188</code></td>
+              <td>兖矿能源</td>
+              <td>
+                <span class="score-bar-wrap">
+                  <span class="score-bar-track"><span class="score-bar-fill" style="width:91%; background:var(--orange);"></span></span>
+                  <span class="score-text" style="color:var(--orange);">0.91</span>
+                </span>
+              </td>
+              <td style="color:var(--red);">+60.3%</td>
+              <td>33天</td>
+              <td><span class="tag tag-orange">观察中</span></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -739,24 +652,16 @@
 </main>
 
 <script>
-  function navigateTo(page) {
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelector('.nav-item[data-page="' + page + '"]').classList.add('active');
-    document.getElementById('page-' + page).classList.add('active');
-  }
+function navigateTo(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + pageId).classList.add('active');
+  document.querySelector('[data-page="' + pageId + '"]').classList.add('active');
+}
 
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', () => navigateTo(item.dataset.page));
-  });
-
-  document.querySelectorAll('.status-pill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      document.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-    });
-  });
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => navigateTo(btn.dataset.page));
+});
 </script>
-
 </body>
 </html>
