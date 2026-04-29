@@ -720,32 +720,102 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 });
 
 // ============================================================
-// SCAN RESULT ROWS → expand inline chart
+// API
 // ============================================================
-document.querySelectorAll('.clickable-row').forEach(row => {
-  row.addEventListener('click', () => {
-    const code = row.dataset.code;
-    const name = row.dataset.name;
-    const phaseIdx = row.dataset.phase;
+const API = 'http://localhost:5555';
 
-    document.getElementById('stockCode').value = code;
-    document.getElementById('stockName').textContent = name;
-    document.getElementById('stockCodeDisplay').textContent = code;
+async function apiGet(url) {
+  const r = await fetch(API + url);
+  if (!r.ok) throw new Error('network error');
+  return r.json();
+}
 
-    const detail = document.getElementById('scanStockDetail');
-    detail.style.display = 'block';
-    document.getElementById('scanDetailName').textContent = name;
-    document.getElementById('scanDetailCode').textContent = code;
-    document.getElementById('scanDetailPhase').textContent = '↑ 2025-11-04 → 2026-01-15  ▬ 2026-01-16 → 2026-02-10';
+async function loadStockList() {
+  try {
+    const json = await apiGet('/api/stock/list');
+    if (json.code !== 0) return;
+    const sel = document.getElementById('stockSelect');
+    sel.innerHTML = '<option value="">— 选择股票 —</option>';
+    json.data.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.code;
+      o.textContent = `${s.code} ${s.name}`;
+      sel.appendChild(o);
+    });
+  } catch (e) { console.error('stock list error', e); }
+}
 
-    document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
-    document.querySelector('.chart-tab[data-ctab="daily"]').classList.add('active');
+// ============================================================
+// SCAN
+// ============================================================
+async function runScan() {
+  const btn = document.getElementById('btnScan');
+  const tbody = document.querySelector('#scanResultTable tbody');
+  const status = document.getElementById('scanStatus');
 
-    loadScanChart(code, 'daily');
+  btn.disabled = true;
+  btn.textContent = '🔄 扫描中…';
+  status.textContent = '正在扫描…';
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">⏳ 正在从全市场扫描，请稍候…</td></tr>';
+  document.getElementById('scanStockDetail').style.display = 'none';
 
-    detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  });
-});
+  try {
+    const json = await apiGet('/api/scan');
+    if (json.code !== 0) throw new Error(json.msg);
+
+    status.textContent = `扫描完成：全市场 ${json.total} 只，发现 ${json.matched_count} 只匹配形态`;
+    tbody.innerHTML = '';
+
+    json.matched.forEach(p => {
+      const tr = document.createElement('tr');
+      tr.className = 'clickable-row';
+      tr.dataset.code = p.stock_code;
+      tr.dataset.name = p.stock_name;
+      tr.dataset.phaseIdx = 0;
+      tr.innerHTML = `
+        <td><code>${p.stock_code}</code></td>
+        <td>${p.stock_name}</td>
+        <td><span class="score-bar-wrap">
+          <span class="score-bar-track"><span class="score-bar-fill" style="width:${(p.pattern_score*100).toFixed(0)}%;background:var(--accent);"></span></span>
+          <span class="score-text" style="color:var(--accent);">${p.pattern_score.toFixed(2)}</span>
+        </span></td>
+        <td style="color:var(--red);">+${(p.uptrend_gain*100).toFixed(1)}%</td>
+        <td>${p.consolidation_days}天</td>
+        <td><span class="tag tag-green">已匹配</span></td>`;
+      tr.addEventListener('click', () => openScanDetail(tr.dataset.code, tr.dataset.name, p));
+      tbody.appendChild(tr);
+    });
+
+    if (json.matched.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">未发现匹配形态</td></tr>';
+    }
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--red);">扫描失败：${e.message}</td></tr>`;
+    status.textContent = '扫描失败';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ 开始扫描';
+  }
+}
+
+function openScanDetail(code, name, pattern) {
+  document.getElementById('stockCode').value = code;
+  document.getElementById('stockName').textContent = name;
+  document.getElementById('stockCodeDisplay').textContent = code;
+
+  const detail = document.getElementById('scanStockDetail');
+  detail.style.display = 'block';
+  document.getElementById('scanDetailName').textContent = name;
+  document.getElementById('scanDetailCode').textContent = code;
+  document.getElementById('scanDetailPhase').textContent =
+    `↑ ${pattern.uptrend_start_date} → ${pattern.uptrend_end_date}  ▬ ${pattern.consolidation_end_date}`;
+
+  document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.chart-tab[data-ctab="daily"]').classList.add('active');
+
+  loadScanChart(code, 'daily');
+  detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
 
 // ============================================================
 // ANALYSIS BUTTONS
@@ -762,6 +832,7 @@ document.getElementById('btnAnalyze2').addEventListener('click', () => {
 
 document.getElementById('stockSelect').addEventListener('change', (e) => {
   const val = e.target.value;
+  if (!val) return;
   const text = e.target.options[e.target.selectedIndex].text;
   const name = text.split(' ')[1];
   document.getElementById('stockCode').value = val;
@@ -783,51 +854,8 @@ document.querySelectorAll('.chart-tab').forEach(tab => {
 });
 
 // ============================================================
-// DATA GENERATION
+// HELPERS
 // ============================================================
-const SCAN_PHASES = [
-  { start: '2025-11-04', uptrendEnd: '2026-01-15', consolEnd: '2026-02-10', gain: 0.154, consol: 14 },
-  { start: '2025-06-15', uptrendEnd: '2025-09-03', consolEnd: '2025-09-16', gain: 0.153, consol: 13 },
-  { start: '2025-06-20', uptrendEnd: '2025-08-12', consolEnd: '2025-08-31', gain: 0.185, consol: 19 },
-  { start: '2025-03-01', uptrendEnd: '2025-06-10', consolEnd: '2025-08-05', gain: 0.263, consol: 52 },
-  { start: '2025-01-10', uptrendEnd: '2025-04-25', consolEnd: '2025-05-28', gain: 0.603, consol: 33 },
-];
-
-function ds(d) { return d.toISOString().slice(0, 10); }
-
-function generateOHLCV() {
-  const data = [];
-  let price = 15 + Math.random() * 5;
-  let t = new Date('2024-01-01');
-  const end = new Date('2026-04-30');
-  while (t <= end) {
-    if (t.getDay() !== 0 && t.getDay() !== 6) {
-      const o = price * (1 + (Math.random() - 0.5) * 0.015);
-      const c = o * (1 + (Math.random() - 0.48) * 0.025);
-      const h = Math.max(o, c) * (1 + Math.random() * 0.01);
-      const l = Math.min(o, c) * (1 - Math.random() * 0.01);
-      data.push({ time: ds(t), open: +o.toFixed(3), high: +h.toFixed(3), low: +l.toFixed(3), close: +c.toFixed(3), volume: Math.round(5_000_000 + Math.random() * 10_000_000) });
-      price = c;
-    }
-    t.setDate(t.getDate() + 1);
-  }
-  return data;
-}
-
-function generateIntraday(basePrice) {
-  const data = [];
-  const date = new Date('2026-02-10');
-  for (let i = 0; i < 240; i++) {
-    const t = new Date(date);
-    t.setHours(9, 30 + i, 0, 0);
-    const pct = (Math.random() - 0.49) * 0.001;
-    const price = basePrice * (1 + pct);
-    data.push({ time: ds(t) + ' ' + String(t.getHours()).padStart(2,'0') + ':'+String(t.getMinutes()).padStart(2,'0')+':00', value: +price.toFixed(3) });
-    basePrice = price;
-  }
-  return data;
-}
-
 function calcMA(data, period) {
   return data.map((d, i) => {
     if (i < period - 1) return null;
@@ -841,77 +869,110 @@ function calcMA(data, period) {
 // MAIN CHART (stock analysis page)
 // ============================================================
 let mainChart = null;
-let mainCandle = null;
-let mainPhases = [];
-let mainData = [];
 
-function loadMainChart(code) {
+async function loadMainChart(code) {
   const container = document.getElementById('chart');
-  container.innerHTML = '';
+  container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:13px;">⏳ 加载K线数据…</div>';
   if (mainChart) { mainChart.remove(); mainChart = null; }
 
-  mainData = generateOHLCV();
+  try {
+    const [dailyJson, patternJson] = await Promise.all([
+      apiGet(`/api/stock/daily?code=${code}&days=500`),
+      apiGet(`/api/stock/pattern?code=${code}`),
+    ]);
 
-  mainChart = LightweightCharts.createChart(container, {
-    width: container.clientWidth,
-    height: 360,
-    layout: { background: { type: 'solid', color: '#fff' }, textColor: '#86868B', fontSize: 11 },
-    grid: { vertLines: { color: 'rgba(0,0,0,0.05)' }, horzLines: { color: 'rgba(0,0,0,0.05)' } },
-    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-    timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: false, secondsVisible: false },
-    rightPriceScale: { borderColor: 'rgba(0,0,0,0.06)' },
-    handleScroll: true,
-    handleScale: true,
-  });
+    if (dailyJson.code !== 0) throw new Error(dailyJson.msg);
+    const data = dailyJson.data;
+    if (!data || data.length < 30) {
+      container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary);">数据不足</div>';
+      return;
+    }
 
-  mainCandle = mainChart.addCandlestickSeries({
-    upColor: '#FF453A', downColor: '#30D158',
-    borderUpColor: '#FF453A', borderDownColor: '#30D158',
-    wickUpColor: '#FF453A', wickDownColor: '#30D158',
-  });
-  mainCandle.setData(mainData);
+    mainChart = LightweightCharts.createChart(container, {
+      width: container.clientWidth, height: 360,
+      layout: { background: { type: 'solid', color: '#fff' }, textColor: '#86868B', fontSize: 11 },
+      grid: { vertLines: { color: 'rgba(0,0,0,0.05)' }, horzLines: { color: 'rgba(0,0,0,0.05)' } },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+      timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: false, secondsVisible: false },
+      rightPriceScale: { borderColor: 'rgba(0,0,0,0.06)' },
+    });
 
-  const ma5 = mainChart.addLineSeries({ color: '#FF9F0A', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
-  const ma10 = mainChart.addLineSeries({ color: '#5856D6', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
-  const ma20 = mainChart.addLineSeries({ color: '#34C759', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
-  const ma60 = mainChart.addLineSeries({ color: '#FF3B30', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
-  ma5.setData(calcMA(mainData, 5));
-  ma10.setData(calcMA(mainData, 10));
-  ma20.setData(calcMA(mainData, 20));
-  ma60.setData(calcMA(mainData, 60));
+    const candle = mainChart.addCandlestickSeries({
+      upColor: '#FF453A', downColor: '#30D158',
+      borderUpColor: '#FF453A', borderDownColor: '#30D158',
+      wickUpColor: '#FF453A', wickDownColor: '#30D158',
+    });
+    candle.setData(data);
 
-  mainPhases = SCAN_PHASES.map(p => ({
-    ...p,
-    upData: mainData.filter(d => d.time >= p.start && d.time <= p.uptrendEnd).map(d => ({ time: d.time, value: d.high * 1.003 })),
-    conData: mainData.filter(d => d.time > p.uptrendEnd && d.time <= p.consolEnd).map(d => ({ time: d.time, value: d.high * 1.003 })),
-  }));
+    const ma5 = mainChart.addLineSeries({ color: '#FF9F0A', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+    const ma10 = mainChart.addLineSeries({ color: '#5856D6', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+    const ma20 = mainChart.addLineSeries({ color: '#34C759', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+    const ma60 = mainChart.addLineSeries({ color: '#FF3B30', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+    ma5.setData(calcMA(data, 5));
+    ma10.setData(calcMA(data, 10));
+    ma20.setData(calcMA(data, 20));
+    ma60.setData(calcMA(data, 60));
 
-  const upSer = mainChart.addLineSeries({ color: 'rgba(255,69,58,0.55)', lineWidth: 2, lineStyle: 0, crosshairMarkerVisible: false, priceLineVisible: false });
-  const conSer = mainChart.addLineSeries({ color: 'rgba(0,122,255,0.55)', lineWidth: 2, lineStyle: 0, crosshairMarkerVisible: false, priceLineVisible: false });
-  mainPhases.forEach(p => {
-    if (p.upData.length) upSer.setData(p.upData);
-    if (p.conData.length) conSer.setData(p.conData);
-  });
+    if (patternJson.code === 0 && patternJson.data.length > 0) {
+      const phases = patternJson.data;
+      const upSer = mainChart.addLineSeries({ color: 'rgba(255,69,58,0.55)', lineWidth: 2, crosshairMarkerVisible: false, priceLineVisible: false });
+      const conSer = mainChart.addLineSeries({ color: 'rgba(0,122,255,0.55)', lineWidth: 2, crosshairMarkerVisible: false, priceLineVisible: false });
 
-  document.querySelectorAll('.range-btn').forEach(b => { b.classList.remove('active'); if (b.dataset.range === '1y') b.classList.add('active'); });
-  mainChart.timeScale().fitContent();
+      phases.forEach(p => {
+        const upData = data.filter(d => d.time >= p.uptrend_start && d.time <= p.uptrend_end).map(d => ({ time: d.time, value: d.high * 1.003 }));
+        const conData = data.filter(d => d.time > p.uptrend_end && d.time <= p.consolidation_end).map(d => ({ time: d.time, value: d.high * 1.003 }));
+        if (upData.length) upSer.setData(upData);
+        if (conData.length) conSer.setData(conData);
+      });
 
-  document.querySelectorAll('.timeline-item').forEach(item => {
-    item.onclick = () => {
-      document.querySelectorAll('.timeline-item').forEach(i => i.classList.remove('active'));
-      item.classList.add('active');
-      const idx = parseInt(item.dataset.phase);
-      if (mainPhases[idx] && mainPhases[idx].upData.length) {
+      updateTimeline(phases);
+    }
+
+    document.querySelectorAll('.range-btn').forEach(b => { b.classList.remove('active'); if (b.dataset.range === '1y') b.classList.add('active'); });
+    mainChart.timeScale().fitContent();
+
+  } catch (e) {
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--red);">加载失败：${e.message}</div>`;
+  }
+
+  window._mainChartResize = () => { if (mainChart) mainChart.applyOptions({ width: container.clientWidth }); };
+  window.removeEventListener('resize', window._mainChartResize);
+  window.addEventListener('resize', window._mainChartResize);
+}
+
+function updateTimeline(phases) {
+  const list = document.getElementById('timelineList');
+  if (!list) return;
+  list.innerHTML = '';
+  phases.slice(0, 10).forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'timeline-item' + (i === 0 ? ' active' : '');
+    div.dataset.phase = i;
+    div.innerHTML = `
+      <div class="row">
+        <div class="left">
+          <div class="date">${p.consolidation_end}（第${i+1}次）</div>
+          <div class="phase-range">↑ ${p.uptrend_start} → ${p.uptrend_end}　▬ ${p.uptrend_end} → ${p.consolidation_end}</div>
+          <div class="meta">
+            <span class="tag tag-red">↑ +${(p.uptrend_gain*100).toFixed(1)}%</span>
+            <span class="tag tag-blue">盘整${p.consolidation_days}天</span>
+            <span class="tag tag-green">score ${p.pattern_score.toFixed(2)}</span>
+          </div>
+        </div>
+        <span class="tag tag-gray">${i === 0 ? '最新' : '历史'}</span>
+      </div>`;
+    div.onclick = () => {
+      document.querySelectorAll('.timeline-item').forEach(x => x.classList.remove('active'));
+      div.classList.add('active');
+      if (mainChart && p.uptrend_start) {
         mainChart.timeScale().setVisibleRange({
-          from: new Date(mainPhases[idx].start).getTime() / 1000,
-          to: new Date(mainPhases[idx].consolEnd).getTime() / 1000,
+          from: new Date(p.uptrend_start).getTime() / 1000,
+          to: new Date(p.consolidation_end).getTime() / 1000,
         });
       }
     };
+    list.appendChild(div);
   });
-
-  window._mainChartResize = () => { if (mainChart) mainChart.applyOptions({ width: container.clientWidth }); };
-  window.addEventListener('resize', window._mainChartResize);
 }
 
 // ============================================================
@@ -919,54 +980,67 @@ function loadMainChart(code) {
 // ============================================================
 let scanChart = null;
 
-function loadScanChart(code, mode) {
+async function loadScanChart(code, mode) {
   const container = document.getElementById('scanChart');
-  container.innerHTML = '';
+  container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:12px;">⏳ 加载中…</div>';
   if (scanChart) { scanChart.remove(); scanChart = null; }
 
-  if (mode === 'intraday') {
-    scanChart = LightweightCharts.createChart(container, {
-      width: container.clientWidth, height: 280,
-      layout: { background: { type: 'solid', color: '#fff' }, textColor: '#86868B', fontSize: 11 },
-      grid: { vertLines: { color: 'rgba(0,0,0,0.05)' }, horzLines: { color: 'rgba(0,0,0,0.05)' } },
-      timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: true, secondsVisible: false },
-      rightPriceScale: { borderColor: 'rgba(0,0,0,0.06)' },
-    });
-    const basePrice = 23 + Math.random() * 2;
-    const intradayData = generateIntraday(basePrice);
-    const lineSer = scanChart.addLineSeries({ color: '#007AFF', lineWidth: 1.5, crosshairMarkerVisible: true });
-    lineSer.setData(intradayData);
-    scanChart.timeScale().fitContent();
-  } else {
-    const data = generateOHLCV();
-    scanChart = LightweightCharts.createChart(container, {
-      width: container.clientWidth, height: 280,
-      layout: { background: { type: 'solid', color: '#fff' }, textColor: '#86868B', fontSize: 11 },
-      grid: { vertLines: { color: 'rgba(0,0,0,0.05)' }, horzLines: { color: 'rgba(0,0,0,0.05)' } },
-      timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: false, secondsVisible: false },
-      rightPriceScale: { borderColor: 'rgba(0,0,0,0.06)' },
-    });
-    const candle = scanChart.addCandlestickSeries({ upColor: '#FF453A', downColor: '#30D158', borderUpColor: '#FF453A', borderDownColor: '#30D158', wickUpColor: '#FF453A', wickDownColor: '#30D158' });
-    candle.setData(data);
+  try {
+    if (mode === 'intraday') {
+      const json = await apiGet(`/api/stock/intraday?code=${code}&date=${new Date().toISOString().slice(0,10)}`);
+      const raw = json.code === 0 ? json.data : [];
+      if (!raw.length) {
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary);">暂无分时数据</div>';
+        return;
+      }
+      scanChart = LightweightCharts.createChart(container, {
+        width: container.clientWidth, height: 280,
+        layout: { background: { type: 'solid', color: '#fff' }, textColor: '#86868B', fontSize: 11 },
+        grid: { vertLines: { color: 'rgba(0,0,0,0.05)' }, horzLines: { color: 'rgba(0,0,0,0.05)' } },
+        timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: true, secondsVisible: false },
+        rightPriceScale: { borderColor: 'rgba(0,0,0,0.06)' },
+      });
+      const ser = scanChart.addLineSeries({ color: '#007AFF', lineWidth: 1.5, crosshairMarkerVisible: true });
+      ser.setData(raw.map(d => ({ time: d.time, value: d.value })));
+      scanChart.timeScale().fitContent();
+    } else {
+      const json = await apiGet(`/api/stock/daily?code=${code}&days=500`);
+      if (json.code !== 0) throw new Error(json.msg);
+      const data = json.data;
 
-    const ma5 = scanChart.addLineSeries({ color: '#FF9F0A', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
-    const ma10 = scanChart.addLineSeries({ color: '#5856D6', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
-    const ma20 = scanChart.addLineSeries({ color: '#34C759', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
-    const ma60 = scanChart.addLineSeries({ color: '#FF3B30', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
-    ma5.setData(calcMA(data, 5));
-    ma10.setData(calcMA(data, 10));
-    ma20.setData(calcMA(data, 20));
-    ma60.setData(calcMA(data, 60));
+      scanChart = LightweightCharts.createChart(container, {
+        width: container.clientWidth, height: 280,
+        layout: { background: { type: 'solid', color: '#fff' }, textColor: '#86868B', fontSize: 11 },
+        grid: { vertLines: { color: 'rgba(0,0,0,0.05)' }, horzLines: { color: 'rgba(0,0,0,0.05)' } },
+        timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: false, secondsVisible: false },
+        rightPriceScale: { borderColor: 'rgba(0,0,0,0.06)' },
+      });
+      const candle = scanChart.addCandlestickSeries({ upColor: '#FF453A', downColor: '#30D158', borderUpColor: '#FF453A', borderDownColor: '#30D158', wickUpColor: '#FF453A', wickDownColor: '#30D158' });
+      candle.setData(data);
 
-    const ph = SCAN_PHASES[0];
-    const upData = data.filter(d => d.time >= ph.start && d.time <= ph.uptrendEnd).map(d => ({ time: d.time, value: d.high * 1.003 }));
-    const conData = data.filter(d => d.time > ph.uptrendEnd && d.time <= ph.consolEnd).map(d => ({ time: d.time, value: d.high * 1.003 }));
-    const upSer = scanChart.addLineSeries({ color: 'rgba(255,69,58,0.55)', lineWidth: 2, crosshairMarkerVisible: false, priceLineVisible: false });
-    const conSer = scanChart.addLineSeries({ color: 'rgba(0,122,255,0.55)', lineWidth: 2, crosshairMarkerVisible: false, priceLineVisible: false });
-    if (upData.length) upSer.setData(upData);
-    if (conData.length) conSer.setData(conData);
+      const ma5 = scanChart.addLineSeries({ color: '#FF9F0A', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+      const ma10 = scanChart.addLineSeries({ color: '#5856D6', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+      const ma20 = scanChart.addLineSeries({ color: '#34C759', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+      const ma60 = scanChart.addLineSeries({ color: '#FF3B30', lineWidth: 1, crosshairMarkerVisible: false, priceLineVisible: false });
+      ma5.setData(calcMA(data, 5));
+      ma10.setData(calcMA(data, 10));
+      ma20.setData(calcMA(data, 20));
+      ma60.setData(calcMA(data, 60));
 
-    scanChart.timeScale().fitContent();
+      const patJson = await apiGet(`/api/stock/pattern?code=${code}`);
+      if (patJson.code === 0 && patJson.data.length > 0) {
+        const ph = patJson.data[0];
+        const upSer = scanChart.addLineSeries({ color: 'rgba(255,69,58,0.55)', lineWidth: 2, crosshairMarkerVisible: false, priceLineVisible: false });
+        const conSer = scanChart.addLineSeries({ color: 'rgba(0,122,255,0.55)', lineWidth: 2, crosshairMarkerVisible: false, priceLineVisible: false });
+        const upData = data.filter(d => d.time >= ph.uptrend_start && d.time <= ph.uptrend_end).map(d => ({ time: d.time, value: d.high * 1.003 }));
+        const conData = data.filter(d => d.time > ph.uptrend_end && d.time <= ph.consolidation_end).map(d => ({ time: d.time, value: d.high * 1.003 }));
+        if (upData.length) upSer.setData(upData);
+        if (conData.length) conSer.setData(conData);
+      }
+      scanChart.timeScale().fitContent();
+    }
+  } catch (e) {
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--red);">加载失败：${e.message}</div>`;
   }
 }
 
@@ -976,8 +1050,11 @@ window.addEventListener('resize', () => {
 });
 
 window.addEventListener('load', () => {
-  setTimeout(() => loadMainChart('603135'), 100);
+  loadStockList();
+  loadMainChart('603135');
 });
+
+document.getElementById('btnScan').addEventListener('click', runScan);
 </script>
 </body>
 </html>

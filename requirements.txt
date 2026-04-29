@@ -2,3 +2,5 @@ baostock>=0.9.1
 pandas>=1.5.0
 numpy>=1.21.0
 matplotlib>=3.5.0
+flask>=2.3.0
+flask-cors>=4.0.0
