@@ -38,7 +38,6 @@ body {
   display: flex;
 }
 
-/* Sidebar */
 .sidebar {
   width: 220px;
   height: 100vh;
@@ -48,22 +47,14 @@ body {
   flex-direction: column;
   position: sticky;
   top: 0;
+  flex-shrink: 0;
 }
 
-.sidebar-brand {
-  padding: 24px 18px;
-  border-bottom: 1px solid var(--divider);
-}
-
+.sidebar-brand { padding: 24px 18px; border-bottom: 1px solid var(--divider); }
 .sidebar-brand h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.1px; }
 .sidebar-brand .version { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
 
-.sidebar-nav {
-  padding: 10px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
+.sidebar-nav { padding: 10px 10px; display: flex; flex-direction: column; gap: 4px; }
 
 .nav-item {
   display: flex;
@@ -81,15 +72,9 @@ body {
   width: 100%;
   text-align: left;
 }
-
 .nav-item:hover { background: rgba(0,0,0,0.04); color: var(--text-primary); }
 .nav-item.active { background: var(--accent); color: white; }
-
-.nav-item .icon {
-  font-size: 15px;
-  width: 22px;
-  text-align: center;
-}
+.nav-item .icon { font-size: 15px; width: 22px; text-align: center; }
 
 .sidebar-footer {
   margin-top: auto;
@@ -99,17 +84,16 @@ body {
   color: var(--text-secondary);
 }
 
-/* Main */
 .main {
   flex: 1;
-  padding: 28px 36px 60px;
-  max-width: 960px;
-  animation: fadeIn 0.2s ease;
+  padding: 28px 32px 60px;
+  min-width: 0;
 }
 
 .page { display: none; }
 .page.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+.page { animation: fadeIn 0.2s ease; }
 
 .page-header { margin-bottom: 18px; }
 .page-title { font-size: 24px; font-weight: 700; letter-spacing: -0.3px; }
@@ -129,13 +113,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  padding: 13px 16px;
   border-bottom: 1px solid var(--divider);
   background: rgba(0,0,0,0.01);
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .card-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -146,7 +132,7 @@ body {
 
 /* Form */
 .form-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-end; }
-.form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+.form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 120px; }
 .form-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
 .form-input, .form-select {
   width: 100%;
@@ -175,7 +161,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 20px;
+  padding: 9px 18px;
   font-size: 13px;
   font-weight: 600;
   font-family: inherit;
@@ -184,17 +170,19 @@ body {
   cursor: pointer;
   transition: all 0.15s ease;
   line-height: 1.4;
+  white-space: nowrap;
 }
 .btn-primary { background: var(--accent); color: white; box-shadow: 0 1px 3px rgba(0,113,227,0.2); }
 .btn-primary:hover { background: var(--accent-hover); box-shadow: 0 2px 8px rgba(0,113,227,0.3); transform: translateY(-1px); }
 .btn-primary:active { background: var(--accent-active); transform: none; }
 .btn-secondary { background: rgba(0,0,0,0.05); color: var(--text-primary); }
 .btn-secondary:hover { background: rgba(0,0,0,0.09); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
 
 .btn-group { display: flex; gap: 8px; }
 
 /* Tags */
-.tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 12px; }
+.tag { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 12px; }
 .tag-blue { background: rgba(0,113,227,0.1); color: var(--accent); }
 .tag-green { background: rgba(52,199,89,0.1); color: var(--green); }
 .tag-orange { background: rgba(255,149,0,0.1); color: var(--orange); }
@@ -218,14 +206,15 @@ thead th {
 }
 tbody td { padding: 10px 14px; border-bottom: 1px solid var(--divider); vertical-align: middle; }
 tbody tr:last-child td { border-bottom: none; }
-tbody tr:hover { background: rgba(0,113,227,0.03); }
+tbody tr:hover { background: rgba(0,113,227,0.03); cursor: pointer; }
+tbody tr { transition: background 0.1s; }
 tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11px; }
 
 /* Score bar */
 .score-bar-wrap { display: inline-flex; align-items: center; gap: 8px; min-width: 100px; }
-.score-bar-track { flex: 1; height: 6px; background: #E8E8ED; border-radius: 3px; overflow: hidden; }
+.score-bar-track { flex: 1; height: 5px; background: #E8E8ED; border-radius: 3px; overflow: hidden; }
 .score-bar-fill { height: 100%; border-radius: 3px; }
-.score-text { font-size: 11px; font-weight: 700; min-width: 30px; text-align: right; }
+.score-text { font-size: 11px; font-weight: 700; min-width: 28px; text-align: right; }
 
 /* Progress */
 .progress-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
@@ -242,9 +231,9 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
   font-size: 11px;
   line-height: 1.8;
   color: var(--text-secondary);
-  max-height: 160px;
+  max-height: 140px;
   overflow-y: auto;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 .log-line { white-space: pre-wrap; }
 .log-line.ok { color: var(--green); }
@@ -252,67 +241,96 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
 .log-line.err { color: var(--red); }
 .log-line.bold { color: var(--text-primary); font-weight: 600; }
 
-/* Chart area */
-.chart-area {
-  background: rgba(0,0,0,0.01);
-  border: 1.5px dashed var(--divider);
-  border-radius: var(--radius-lg);
-  padding: 28px;
-  text-align: center;
-  color: var(--text-tertiary);
-  font-size: 12px;
-}
-.chart-area .title { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
-
 /* Quick stats */
 .quick-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
 .stat { background: var(--card); border-radius: var(--radius-lg); border: 1px solid var(--card-border); padding: 14px 16px; text-align: center; }
 .stat .n { font-size: 24px; font-weight: 700; }
 .stat .l { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
 
+/* Chart container */
+.chart-container {
+  position: relative;
+  width: 100%;
+  height: 360px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.range-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1.5px solid var(--divider);
+  border-radius: 20px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.range-btn:hover { border-color: var(--accent); color: var(--accent); }
+.range-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
 /* Timeline */
-.timeline { margin-top: 10px; }
+.timeline { }
 .timeline-item {
-  padding: 14px;
+  padding: 12px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--divider);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   background: rgba(0,0,0,0.01);
+  cursor: pointer;
+  transition: all 0.15s;
 }
+.timeline-item:hover { border-color: var(--accent); background: rgba(0,113,227,0.03); }
 .timeline-item.active { border-color: rgba(0,113,227,0.3); background: rgba(0,113,227,0.04); }
 .timeline-item .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.timeline-item .left { display: flex; flex-direction: column; gap: 4px; }
+.timeline-item .left { display: flex; flex-direction: column; gap: 5px; }
 .timeline-item .date { font-size: 11px; color: var(--text-secondary); font-weight: 600; }
-.timeline-item .meta { font-size: 12px; color: var(--text-primary); }
+.timeline-item .meta { font-size: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
 
-/* Tabs (for view switching) */
-.tabs { display: flex; gap: 0; background: rgba(0,0,0,0.04); border-radius: var(--radius-md); padding: 3px; width: fit-content; margin-bottom: 14px; }
-.tab { padding: 7px 16px; font-size: 12px; font-weight: 600; font-family: inherit; border: none; background: none; border-radius: 8px; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
-.tab.active { background: var(--card); color: var(--text-primary); box-shadow: var(--shadow-sm); }
-.tab:hover:not(.active) { color: var(--text-primary); }
-
-/* Empty */
-.empty {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-tertiary);
+.stock-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
 }
-.empty .icon { font-size: 36px; margin-bottom: 10px; opacity: 0.4; }
-.empty h3 { font-size: 14px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
-.empty p { font-size: 12px; line-height: 1.6; }
+.stock-name { font-size: 18px; font-weight: 700; }
+.stock-code { font-size: 12px; color: var(--text-secondary); font-family: 'SF Mono', Monaco, monospace; }
 
 @media (max-width: 800px) {
-  .sidebar { width: 60px; }
-  .sidebar-brand h1, .sidebar-brand .version, .nav-item .label, .sidebar-footer { display: none; }
-  .sidebar-brand { padding: 18px 10px; text-align: center; }
-  .sidebar-nav { padding: 10px 6px; }
-  .nav-item { justify-content: center; padding: 12px; }
-  .main { padding: 20px 16px; }
+  body { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: static; flex-direction: row; }
+  .sidebar-brand { border-bottom: none; padding: 14px 16px; }
+  .sidebar-nav { flex-direction: row; }
+  .sidebar-footer { display: none; }
+  .main { padding: 16px; }
   .quick-stats { grid-template-columns: repeat(1, 1fr); }
+  .form-row { flex-wrap: wrap; }
 }
 </style>
 </head>
 <body>
+
+<!-- TradingView lightweight-charts -->
+<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 
 <!-- Sidebar -->
 <aside class="sidebar">
@@ -354,24 +372,33 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
     </div>
     <div class="card-body">
       <div class="form-row">
-        <div class="form-group">
+        <div class="form-group" style="max-width:200px;">
           <label class="form-label">股票代码</label>
-          <input class="form-input" type="text" placeholder="输入代码，例如：603135" value="603135">
+          <input class="form-input" type="text" id="stockCode" placeholder="例如：603135" value="603135">
         </div>
-        <div class="form-group">
-          <label class="form-label">或从最近选</label>
-          <select class="form-select">
-            <option>603135 中重科技</option>
-            <option>301439 泓淋电力</option>
-            <option>600831 广电网络</option>
+        <div class="form-group" style="max-width:240px;">
+          <label class="form-label">从扫描结果选</label>
+          <select class="form-select" id="stockSelect">
+            <option value="603135">603135 中重科技</option>
+            <option value="301439">301439 泓淋电力</option>
+            <option value="600831">600831 广电网络</option>
           </select>
         </div>
-        <button class="btn btn-primary">▶ 分析</button>
+        <button class="btn btn-primary" id="btnAnalyze">▶ 分析</button>
       </div>
     </div>
   </div>
 
-  <!-- 快速统计 -->
+  <!-- 股票信息 + 统计 -->
+  <div class="stock-info">
+    <span class="stock-name" id="stockName">中重科技</span>
+    <span class="stock-code" id="stockCodeDisplay">603135</span>
+    <div style="display:flex;gap:6px;margin-left:auto;">
+      <span class="tag tag-green">当前已匹配</span>
+      <span class="tag tag-blue">2026-02-10</span>
+    </div>
+  </div>
+
   <div class="quick-stats">
     <div class="stat">
       <div class="n" style="color:var(--accent);">3</div>
@@ -387,87 +414,75 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
     </div>
   </div>
 
-  <!-- K线图 + 形态标注 -->
+  <!-- K线图 -->
   <div class="card">
     <div class="card-header">
-      <span class="card-title">形态标注图</span>
-      <div style="display:flex; gap:8px; align-items:center;">
-        <span class="tag tag-green">当前已匹配</span>
+      <span class="card-title">K线图 · 形态标注</span>
+      <div class="chart-controls">
+        <button class="range-btn" data-range="3m">3月</button>
+        <button class="range-btn" data-range="6m">6月</button>
+        <button class="range-btn active" data-range="1y">1年</button>
+        <button class="range-btn" data-range="2y">2年</button>
+        <button class="range-btn" data-range="all">全部</button>
       </div>
     </div>
     <div class="card-body">
-      <div class="chart-area" style="height:220px;">
-        <div class="title">603135 · 中重科技 · K线图</div>
-        <div style="display:flex; gap:24px; margin-top:16px; font-size:13px;">
-          <span><strong style="color:var(--red);">↑ 上涨段</strong> 2025-11-04 → 2026-01-15 (+15.4%)</span>
-          <span><strong style="color:var(--accent);">▬ 盘整段</strong> 2026-01-16 → 2026-02-10 (14天)</span>
-        </div>
-        <div style="margin-top:20px; width:80%; height:8px; background:#E8E8ED; border-radius:4px; overflow:hidden;">
-          <div style="height:100%; width:30%; background:var(--red); float:left;"></div>
-          <div style="height:100%; width:70%; background:var(--accent); float:left;"></div>
-        </div>
+      <div class="chart-container" id="chartContainer">
+        <div id="chart" style="width:100%;height:100%;"></div>
+      </div>
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#FF453A;"></div>上涨段（均线多头）</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#007AFF;"></div>盘整段（布林带收窄）</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#30D158;"></div>当前选中阶段</div>
       </div>
     </div>
   </div>
 
-  <!-- 历史阶段列表 -->
+  <!-- 历史阶段 -->
   <div class="card">
     <div class="card-header">
       <span class="card-title">历史形态阶段</span>
+      <span style="font-size:11px;color:var(--text-secondary);">点击阶段可在上图定位</span>
     </div>
     <div class="card-body">
-      <div class="timeline">
-        <div class="timeline-item active">
+      <div class="timeline" id="timeline">
+        <div class="timeline-item active" data-phase="0">
           <div class="row">
             <div class="left">
               <div class="date">2026-02-10（最新）</div>
               <div class="meta">
-                <span class="tag tag-blue">+15.4%</span>
-                <span class="tag tag-orange">盘整14天</span>
+                <span class="tag tag-red">↑ +15.4%</span>
+                <span class="tag tag-blue">盘整14天</span>
+                <span class="tag tag-green">score 0.85</span>
               </div>
             </div>
-            <div class="right">
-              <span class="score-bar-wrap">
-                <span class="score-bar-track"><span class="score-bar-fill" style="width:85%; background:var(--accent);"></span></span>
-                <span class="score-text" style="color:var(--accent);">0.85</span>
-              </span>
-            </div>
+            <span class="tag tag-gray">已匹配</span>
           </div>
         </div>
-
-        <div class="timeline-item">
+        <div class="timeline-item" data-phase="1">
           <div class="row">
             <div class="left">
               <div class="date">2025-09-03</div>
               <div class="meta">
-                <span class="tag tag-blue">+15.3%</span>
-                <span class="tag tag-orange">盘整13天</span>
+                <span class="tag tag-red">↑ +15.3%</span>
+                <span class="tag tag-blue">盘整13天</span>
+                <span class="tag tag-green">score 0.82</span>
               </div>
             </div>
-            <div class="right">
-              <span class="score-bar-wrap">
-                <span class="score-bar-track"><span class="score-bar-fill" style="width:82%; background:var(--accent);"></span></span>
-                <span class="score-text" style="color:var(--accent);">0.82</span>
-              </span>
-            </div>
+            <span class="tag tag-gray">已匹配</span>
           </div>
         </div>
-
-        <div class="timeline-item">
+        <div class="timeline-item" data-phase="2">
           <div class="row">
             <div class="left">
               <div class="date">2025-08-12</div>
               <div class="meta">
-                <span class="tag tag-blue">+18.5%</span>
-                <span class="tag tag-orange">盘整19天</span>
+                <span class="tag tag-red">↑ +18.5%</span>
+                <span class="tag tag-blue">盘整19天</span>
+                <span class="tag tag-green">score 0.78</span>
               </div>
             </div>
-            <div class="right">
-              <span class="score-bar-wrap">
-                <span class="score-bar-track"><span class="score-bar-fill" style="width:78%; background:var(--accent);"></span></span>
-                <span class="score-text" style="color:var(--accent);">0.78</span>
-              </span>
-            </div>
+            <span class="tag tag-gray">已匹配</span>
           </div>
         </div>
       </div>
@@ -503,9 +518,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
         <div class="form-group">
           <label class="form-label">并行</label>
           <select class="form-select">
-            <option>2</option>
-            <option selected>3</option>
-            <option>4</option>
+            <option>2</option><option selected>3</option><option>4</option>
           </select>
         </div>
         <div class="form-group">
@@ -513,15 +526,14 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
           <input class="form-input" type="number" value="0" min="0">
         </div>
       </div>
-
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">上涨涨幅</label>
+          <label class="form-label">上涨涨幅（%）</label>
           <input class="form-input" type="number" value="15" min="5" max="50">
         </div>
         <div class="form-group">
           <label class="form-label">盘整天数</label>
-          <div style="display:flex; gap:8px; align-items:center;">
+          <div style="display:flex;gap:8px;align-items:center;">
             <input class="form-input" type="number" value="10" min="5" max="30" style="flex:1;">
             <span style="color:var(--text-tertiary);">~</span>
             <input class="form-input" type="number" value="40" min="20" max="120" style="flex:1;">
@@ -532,8 +544,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
           <input class="form-input" type="number" value="0.20" step="0.01">
         </div>
       </div>
-
-      <div class="btn-group" style="margin-top:6px;">
+      <div class="btn-group">
         <button class="btn btn-primary" style="flex:1;">▶ 开始扫描</button>
         <button class="btn btn-secondary">⏹ 停止</button>
       </div>
@@ -547,7 +558,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
       <div style="display:flex; gap:8px; align-items:center;">
         <span class="tag tag-green">19 已匹配</span>
         <span class="tag tag-orange">154 观察中</span>
-        <button class="btn btn-secondary" style="padding:5px 12px; font-size:12px;">导出 CSV</button>
+        <button class="btn btn-secondary btn-sm">导出 CSV</button>
       </div>
     </div>
     <div class="card-body">
@@ -557,90 +568,44 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
       <div class="log-panel">
         <div class="log-line ok">[17:22:01] ✓ 扫描开始</div>
         <div class="log-line">[17:22:02]   加载股票列表: 5318 只</div>
-        <div class="log-line">[17:22:03]   过滤 ST 股: 跳过 23 只</div>
-        <div class="log-line bold">[17:22:04] ⌕ 000001 平安银行</div>
         <div class="log-line ok">[17:22:06] ✓ 603135 中重科技 [匹配] score=0.85</div>
         <div class="log-line warn">[17:22:08] → 600188 兖矿能源 [观察] score=0.91</div>
         <div class="log-line ok">[17:22:42] ✓ 扫描完成 · 500只 · 19匹配 · 耗时 41s</div>
       </div>
 
       <div class="table-wrap" style="margin-top:12px;">
-        <table>
+        <table id="scanResultTable">
           <thead>
             <tr>
-              <th>代码</th>
-              <th>名称</th>
-              <th style="min-width:120px;">评分</th>
-              <th>涨幅</th>
-              <th>盘整</th>
-              <th>状态</th>
+              <th>代码</th><th>名称</th><th style="min-width:110px;">评分</th>
+              <th>涨幅</th><th>盘整</th><th>状态</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td><code>603135</code></td>
-              <td>中重科技</td>
-              <td>
-                <span class="score-bar-wrap">
-                  <span class="score-bar-track"><span class="score-bar-fill" style="width:85%; background:var(--accent);"></span></span>
-                  <span class="score-text" style="color:var(--accent);">0.85</span>
-                </span>
-              </td>
-              <td style="color:var(--red);">+15.4%</td>
-              <td>14天</td>
-              <td><span class="tag tag-green">已匹配</span></td>
+            <tr class="clickable-row" data-code="603135" data-name="中重科技">
+              <td><code>603135</code></td><td>中重科技</td>
+              <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:85%;background:var(--accent);"></span></span><span class="score-text" style="color:var(--accent);">0.85</span></span></td>
+              <td style="color:var(--red);">+15.4%</td><td>14天</td><td><span class="tag tag-green">已匹配</span></td>
             </tr>
-            <tr>
-              <td><code>301439</code></td>
-              <td>泓淋电力</td>
-              <td>
-                <span class="score-bar-wrap">
-                  <span class="score-bar-track"><span class="score-bar-fill" style="width:82%; background:var(--accent);"></span></span>
-                  <span class="score-text" style="color:var(--accent);">0.82</span>
-                </span>
-              </td>
-              <td style="color:var(--red);">+15.3%</td>
-              <td>13天</td>
-              <td><span class="tag tag-green">已匹配</span></td>
+            <tr class="clickable-row" data-code="301439" data-name="泓淋电力">
+              <td><code>301439</code></td><td>泓淋电力</td>
+              <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:82%;background:var(--accent);"></span></span><span class="score-text" style="color:var(--accent);">0.82</span></span></td>
+              <td style="color:var(--red);">+15.3%</td><td>13天</td><td><span class="tag tag-green">已匹配</span></td>
             </tr>
-            <tr>
-              <td><code>600831</code></td>
-              <td>广电网络</td>
-              <td>
-                <span class="score-bar-wrap">
-                  <span class="score-bar-track"><span class="score-bar-fill" style="width:78%; background:var(--accent);"></span></span>
-                  <span class="score-text" style="color:var(--accent);">0.78</span>
-                </span>
-              </td>
-              <td style="color:var(--red);">+18.5%</td>
-              <td>19天</td>
-              <td><span class="tag tag-green">已匹配</span></td>
+            <tr class="clickable-row" data-code="600831" data-name="广电网络">
+              <td><code>600831</code></td><td>广电网络</td>
+              <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:78%;background:var(--accent);"></span></span><span class="score-text" style="color:var(--accent);">0.78</span></span></td>
+              <td style="color:var(--red);">+18.5%</td><td>19天</td><td><span class="tag tag-green">已匹配</span></td>
             </tr>
-            <tr>
-              <td><code>600054</code></td>
-              <td>黄山旅游</td>
-              <td>
-                <span class="score-bar-wrap">
-                  <span class="score-bar-track"><span class="score-bar-fill" style="width:95%; background:var(--orange);"></span></span>
-                  <span class="score-text" style="color:var(--orange);">0.95</span>
-                </span>
-              </td>
-              <td style="color:var(--red);">+26.3%</td>
-              <td>52天</td>
-              <td><span class="tag tag-orange">观察中</span></td>
+            <tr class="clickable-row" data-code="600054" data-name="黄山旅游">
+              <td><code>600054</code></td><td>黄山旅游</td>
+              <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:95%;background:var(--orange);"></span></span><span class="score-text" style="color:var(--orange);">0.95</span></span></td>
+              <td style="color:var(--red);">+26.3%</td><td>52天</td><td><span class="tag tag-orange">观察中</span></td>
             </tr>
-            <tr>
-              <td><code>600188</code></td>
-              <td>兖矿能源</td>
-              <td>
-                <span class="score-bar-wrap">
-                  <span class="score-bar-track"><span class="score-bar-fill" style="width:91%; background:var(--orange);"></span></span>
-                  <span class="score-text" style="color:var(--orange);">0.91</span>
-                </span>
-              </td>
-              <td style="color:var(--red);">+60.3%</td>
-              <td>33天</td>
-              <td><span class="tag tag-orange">观察中</span></td>
+            <tr class="clickable-row" data-code="600188" data-name="兖矿能源">
+              <td><code>600188</code></td><td>兖矿能源</td>
+              <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:91%;background:var(--orange);"></span></span><span class="score-text" style="color:var(--orange);">0.91</span></span></td>
+              <td style="color:var(--red);">+60.3%</td><td>33天</td><td><span class="tag tag-orange">观察中</span></td>
             </tr>
           </tbody>
         </table>
@@ -652,6 +617,9 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
 </main>
 
 <script>
+// ============================================================
+// NAVIGATION
+// ============================================================
 function navigateTo(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -661,6 +629,180 @@ function navigateTo(pageId) {
 
 document.querySelectorAll('.nav-item').forEach(btn => {
   btn.addEventListener('click', () => navigateTo(btn.dataset.page));
+});
+
+// ============================================================
+// SCAN RESULT ROWS → go to stock analysis
+// ============================================================
+document.querySelectorAll('.clickable-row').forEach(row => {
+  row.addEventListener('click', () => {
+    const code = row.dataset.code;
+    const name = row.dataset.name;
+    document.getElementById('stockCode').value = code;
+    document.getElementById('stockName').textContent = name;
+    document.getElementById('stockCodeDisplay').textContent = code;
+    navigateTo('stock');
+    loadChart(code);
+  });
+});
+
+// ============================================================
+// ANALYSIS BUTTON
+// ============================================================
+document.getElementById('btnAnalyze').addEventListener('click', () => {
+  const code = document.getElementById('stockCode').value.trim();
+  if (code) loadChart(code);
+});
+
+document.getElementById('stockSelect').addEventListener('change', (e) => {
+  const val = e.target.value;
+  const text = e.target.options[e.target.selectedIndex].text;
+  const name = text.split(' ')[1];
+  document.getElementById('stockCode').value = val;
+  document.getElementById('stockName').textContent = name;
+  document.getElementById('stockCodeDisplay').textContent = val;
+  loadChart(val);
+});
+
+// ============================================================
+// CHART — generate realistic mock OHLCV data
+// ============================================================
+const PHASES = [
+  { start: '2025-02-10', uptrendEnd: '2025-04-20', consolEnd: '2025-05-10', gain: 0.154, consol: 14 },
+  { start: '2025-06-01', uptrendEnd: '2025-09-03', consolEnd: '2025-09-16', gain: 0.153, consol: 13 },
+  { start: '2025-06-20', uptrendEnd: '2025-08-12', consolEnd: '2025-08-31', gain: 0.185, consol: 19 },
+];
+
+function dateStr(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function generateOHLCV(code) {
+  const data = [];
+  let price = 15 + Math.random() * 5;
+  let t = new Date('2024-01-01');
+  const end = new Date('2026-04-30');
+
+  while (t <= end) {
+    if (t.getDay() === 0 || t.getDay() === 6) { t.setDate(t.getDate() + 1); continue; }
+
+    const dayStr = dateStr(t);
+    const open = price * (1 + (Math.random() - 0.5) * 0.015);
+    const close = open * (1 + (Math.random() - 0.48) * 0.025);
+    const high = Math.max(open, close) * (1 + Math.random() * 0.01);
+    const low = Math.min(open, close) * (1 - Math.random() * 0.01);
+    const vol = 5_000_000 + Math.random() * 10_000_000;
+
+    data.push({ time: dayStr, open: +open.toFixed(3), high: +high.toFixed(3), low: +low.toFixed(3), close: +close.toFixed(3), volume: Math.round(vol) });
+    price = close;
+    t.setDate(t.getDate() + 1);
+  }
+  return data;
+}
+
+let chart = null;
+let candleSeries = null;
+let uptrendLineSeries = null;
+let consolLineSeries = null;
+let currentPhases = [];
+
+function loadChart(code) {
+  const container = document.getElementById('chart');
+  container.innerHTML = '';
+
+  if (chart) { chart.remove(); chart = null; }
+
+  chart = LightweightCharts.createChart(container, {
+    width: container.clientWidth,
+    height: container.clientHeight || 360,
+    layout: {
+      background: { type: 'solid', color: '#ffffff' },
+      textColor: '#86868B',
+      fontSize: 11,
+    },
+    grid: {
+      vertLines: { color: 'rgba(0,0,0,0.05)' },
+      horzLines: { color: 'rgba(0,0,0,0.05)' },
+    },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    timeScale: {
+      borderColor: 'rgba(0,0,0,0.06)',
+      timeVisible: true,
+    },
+    rightPriceScale: { borderColor: 'rgba(0,0,0,0.06)' },
+  });
+
+  candleSeries = chart.addCandlestickSeries({
+    upColor: '#FF453A',
+    downColor: '#30D158',
+    borderUpColor: '#FF453A',
+    borderDownColor: '#30D158',
+    wickUpColor: '#FF453A',
+    wickDownColor: '#30D158',
+  });
+
+  uptrendLineSeries = chart.addLineSeries({
+    color: 'rgba(255,69,58,0.5)',
+    lineWidth: 2,
+    lineStyle: LightweightCharts.LineStyle.Solid,
+    crosshairMarkerVisible: false,
+  });
+
+  consolLineSeries = chart.addLineSeries({
+    color: 'rgba(0,122,255,0.5)',
+    lineWidth: 2,
+    lineStyle: LightweightCharts.LineStyle.Solid,
+    crosshairMarkerVisible: false,
+  });
+
+  const allData = generateOHLCV(code);
+  candleSeries.setData(allData);
+
+  currentPhases = JSON.parse(JSON.stringify(PHASES));
+  currentPhases.forEach(p => {
+    p.uptrendData = allData.filter(d => d.time >= p.start && d.time <= p.uptrendEnd).map(d => ({ time: d.time, value: d.high * 1.005 }));
+    p.consolData = allData.filter(d => d.time > p.uptrendEnd && d.time <= p.consolEnd).map(d => ({ time: d.time, value: d.high * 1.005 }));
+  });
+
+  currentPhases.forEach((p, i) => {
+    if (p.uptrendData.length > 0) uptrendLineSeries.setData(p.uptrendData);
+    if (p.consolData.length > 0) consolLineSeries.setData(p.consolData);
+  });
+
+  // Range buttons
+  document.querySelectorAll('.range-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.dataset.range === '1y') btn.classList.add('active');
+  });
+
+  chart.timeScale().fitContent();
+
+  // Click phase → scroll to it
+  document.querySelectorAll('.timeline-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.timeline-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      const idx = parseInt(item.dataset.phase);
+      if (currentPhases[idx] && currentPhases[idx].uptrendData.length > 0) {
+        chart.timeScale().setVisibleRange({
+          from: new Date(currentPhases[idx].start).getTime() / 1000,
+          to: new Date(currentPhases[idx].consolEnd).getTime() / 1000,
+        });
+      }
+    });
+  });
+
+  // Resize
+  window.addEventListener('resize', () => {
+    if (chart && container.clientWidth > 0) {
+      chart.applyOptions({ width: container.clientWidth });
+    }
+  });
+}
+
+// Init chart on load
+window.addEventListener('load', () => {
+  setTimeout(() => loadChart('603135'), 100);
 });
 </script>
 </body>
