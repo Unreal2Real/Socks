@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+data/scan_state.db
+results/
+report/
+.env
+*.egg-info/
+dist/
+build/
+venv/
+*技术方案文档*.md
+*.vsix
+debug_pattern.py
