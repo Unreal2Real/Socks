@@ -81,14 +81,13 @@ def stock_intraday():
 
     fetcher = DataFetcher()
     try:
-        bs_code = code if code.startswith('sh.') or code.startswith('sz.') else fetcher._to_bs_code(code)
-        rs = fetcher.bs.query_history_k_data_plus(
-            bs_code if not code.startswith('sh.') and not code.startswith('sz.') else code,
+        bs_code = fetcher._to_bs_code(fetcher._format_stock_code(code))
+        rs = fetcher._query(
+            bs_code,
             "date,time,open,high,low,close,volume",
             start_date=date,
             end_date=date,
-            frequency="5",
-            adjustflag="2"
+            frequency="5"
         )
         rows = []
         while rs.next():
@@ -258,5 +257,5 @@ def scan():
 
 
 if __name__ == '__main__':
-    print("启动 API 服务 http://localhost:5555")
-    app.run(host='0.0.0.0', port=5555, debug=True)
+    print('启动 API 服务 http://localhost:5555')
+    app.run(host='0.0.0.0', port=5555, debug=False, threaded=True)

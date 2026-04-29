@@ -1,3 +1,4 @@
+import threading
 import baostock as bs
 import pandas as pd
 import numpy as np
@@ -6,25 +7,36 @@ from typing import Optional
 
 
 class DataFetcher:
+    _bs_lock = threading.RLock()
+    _logged_in = False
+
     def __init__(self):
         self.bs = bs
-        self._logged_in = False
 
     def _ensure_login(self):
-        if not self._logged_in:
-            lg = self.bs.login()
-            if lg.error_code == '0':
-                self._logged_in = True
-            else:
-                print(f"Baostock login warning: {lg.error_msg}")
+        with DataFetcher._bs_lock:
+            if not DataFetcher._logged_in:
+                lg = self.bs.login()
+                if lg.error_code == '0':
+                    DataFetcher._logged_in = True
+                else:
+                    print(f"Baostock login warning: {lg.error_msg}")
+
+    def _query(self, bs_code: str, fields: str, start_date: str, end_date: str, frequency: str):
+        with DataFetcher._bs_lock:
+            self._ensure_login()
+            return self.bs.query_history_k_data_plus(
+                bs_code, fields, start_date=start_date, end_date=end_date,
+                frequency=frequency, adjustflag="2")
 
     def close(self):
-        if self._logged_in:
-            try:
-                self.bs.logout()
-            except Exception:
-                pass
-            self._logged_in = False
+        with DataFetcher._bs_lock:
+            if DataFetcher._logged_in:
+                try:
+                    self.bs.logout()
+                except Exception:
+                    pass
+                DataFetcher._logged_in = False
 
     def get_daily_data_in_range(self, stock_code: str,
                                  start_date: str, end_date: str) -> pd.DataFrame:
@@ -34,13 +46,12 @@ class DataFetcher:
         bs_code = self._to_bs_code(stock_code)
 
         try:
-            rs = self.bs.query_history_k_data_plus(
+            rs = self._query(
                 bs_code,
                 "date,open,high,low,close,volume",
                 start_date=start_date,
                 end_date=end_date,
-                frequency="d",
-                adjustflag="2"
+                frequency="d"
             )
 
             if rs.error_code != '0':
@@ -77,13 +88,12 @@ class DataFetcher:
         start_date = (datetime.now() - timedelta(days=days * 2)).strftime('%Y-%m-%d')
 
         try:
-            rs = self.bs.query_history_k_data_plus(
+            rs = self._query(
                 bs_code,
                 "date,open,high,low,close,volume",
                 start_date=start_date,
                 end_date=end_date,
-                frequency="d",
-                adjustflag="2"
+                frequency="d"
             )
 
             if rs.error_code != '0':
@@ -95,7 +105,7 @@ class DataFetcher:
                 row = ['0' if v == 'None' else v for v in row]
                 rows.append(row)
 
-            if len(rows) < 30:
+            if len(rows) < min(days, 10):
                 return pd.DataFrame()
 
             df = pd.DataFrame(rows, columns=['date', 'open', 'high', 'low', 'close', 'volume'])
@@ -120,45 +130,46 @@ class DataFetcher:
         return [code for code, name in stocks_with_names]
 
     def get_stock_list_with_names(self) -> list:
-        self._ensure_login()
-        trading_dates = []
-        d = datetime.now()
-        for _ in range(10):
-            trading_dates.append(d.strftime('%Y-%m-%d'))
-            d -= timedelta(days=1)
+        with DataFetcher._bs_lock:
+            self._ensure_login()
+            trading_dates = []
+            d = datetime.now()
+            for _ in range(10):
+                trading_dates.append(d.strftime('%Y-%m-%d'))
+                d -= timedelta(days=1)
 
-        for date_str in trading_dates:
-            try:
-                rs = self.bs.query_all_stock(day=date_str)
-                if rs.error_code != '0':
-                    continue
-
-                data = rs.data
-                if not data or len(data) == 0:
-                    continue
-
-                stock_list = []
-                for row in data:
-                    code = row[0]
-                    type_flag = row[1]
-                    name = row[2] if len(row) > 2 else ''
-
-                    if type_flag != '1':
-                        continue
-                    if not self._is_stock_code(code):
+            for date_str in trading_dates:
+                try:
+                    rs = self.bs.query_all_stock(day=date_str)
+                    if rs.error_code != '0':
                         continue
 
-                    plain_code = self._from_bs_code(code)
-                    stock_list.append((plain_code, name))
+                    data = rs.data
+                    if not data or len(data) == 0:
+                        continue
 
-                if stock_list:
-                    print(f"获取到 {len(stock_list)} 只股票 (数据日期: {date_str})")
-                    return stock_list
+                    stock_list = []
+                    for row in data:
+                        code = row[0]
+                        type_flag = row[1]
+                        name = row[2] if len(row) > 2 else ''
 
-            except Exception:
-                continue
+                        if type_flag != '1':
+                            continue
+                        if not self._is_stock_code(code):
+                            continue
 
-        return []
+                        plain_code = self._from_bs_code(code)
+                        stock_list.append((plain_code, name))
+
+                    if stock_list:
+                        print(f"获取到 {len(stock_list)} 只股票 (数据日期: {date_str})")
+                        return stock_list
+
+                except Exception:
+                    continue
+
+            return []
 
     def get_stock_info(self, stock_code: str) -> dict:
         self._ensure_login()
