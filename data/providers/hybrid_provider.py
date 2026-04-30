@@ -81,7 +81,12 @@ class HybridProvider(DataProvider):
             try:
                 stocks = self.tdx_reader.stocks()
                 if stocks is not None:
-                    return [(str(code), name) for code, name in stocks.items()]
+                    filtered = []
+                    for code, name in stocks.items():
+                        if self._is_main_board_stock(str(code), name):
+                            filtered.append((str(code), name))
+                    if filtered:
+                        return filtered
             except Exception:
                 pass
         
@@ -111,6 +116,43 @@ class HybridProvider(DataProvider):
                 pass
         
         return {'code': stock_code, 'name': ''}
+
+    @staticmethod
+    def _is_main_board_stock(code: str, name: str) -> bool:
+        plain = code.zfill(6)
+        
+        if plain.startswith('600') or plain.startswith('601') or plain.startswith('603') or plain.startswith('605'):
+            return True
+        
+        if plain.startswith('688'):
+            return False
+        
+        if plain.startswith('300') or plain.startswith('301'):
+            return False
+        
+        if plain.startswith('8') or plain.startswith('4'):
+            return False
+        
+        if plain.startswith('000') or plain.startswith('001') or plain.startswith('002'):
+            index_keywords = ['指数', '基金', '国债', '企债', '上证', '深证', '综指', 
+                              '成指', 'A股', 'B股', '等权', '基本', '全指', '全R',
+                              '沪公司', '沪企', '周期', '非周', '债', '成长', '价值',
+                              '民企', '国企', '海外', '中盘', '小盘', '中小', '380',
+                              '180', '50', '全指', '消费80', '高端', '主题', '服务',
+                              '食品饮料', '医药生物', '细分', '有色', '中证', '银河',
+                              '投资品', '消费品', '产业', '装备']
+            for keyword in index_keywords:
+                if keyword in name:
+                    return False
+            if len(name) <= 4 and ('A' in name or 'B' in name):
+                return True
+            if any(kw in name for kw in ['ST', '*ST', '退']):
+                return True
+            if len(name) >= 2 and not any(kw in name for kw in ['指数', '基金', '债']):
+                return True
+            return False
+        
+        return False
 
     def close(self):
         if self.quotes_client:
