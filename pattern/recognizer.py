@@ -40,7 +40,15 @@ class PatternRecognizer:
                 uptrend_result = self._scan_uptrend(df, i)
                 if uptrend_result:
                     uptrend_end_idx, uptrend_gain = uptrend_result
-                    consolidation_result = self._scan_consolidation(df, uptrend_end_idx)
+
+                    last_idx = len(df) - 1
+                    ongoing_days = last_idx - uptrend_end_idx
+                    if ongoing_days >= self.consolidation_days_min and \
+                       self._is_valid_consolidation(df, uptrend_end_idx, last_idx, ongoing=True):
+                        consolidation_result = (last_idx, ongoing_days)
+                    else:
+                        consolidation_result = self._scan_consolidation(df, uptrend_end_idx)
+
                     if consolidation_result:
                         consolidation_end_idx, consolidation_days = consolidation_result
                         return {
@@ -99,7 +107,8 @@ class PatternRecognizer:
                 return i, days
         return None
 
-    def _is_valid_consolidation(self, df: pd.DataFrame, start_idx: int, end_idx: int) -> bool:
+    def _is_valid_consolidation(self, df: pd.DataFrame, start_idx: int, end_idx: int,
+                                 ongoing: bool = False) -> bool:
         period_df = df.loc[start_idx:end_idx]
 
         if 'bb_bandwidth' not in period_df.columns:
@@ -109,20 +118,24 @@ class PatternRecognizer:
         min_close = period_df['close'].min()
 
         retrace = (peak_price - min_close) / peak_price
-        if retrace > self.max_retrace_pct:
+        retrace_limit = self.max_retrace_pct * 1.3 if ongoing else self.max_retrace_pct
+        if retrace > retrace_limit:
             return False
 
         avg_bandwidth = period_df['bb_bandwidth'].mean()
-        if avg_bandwidth >= self.bandwidth_threshold:
+        bw_limit = self.bandwidth_threshold * 1.5 if ongoing else self.bandwidth_threshold
+        if avg_bandwidth >= bw_limit:
             return False
 
         volatility = TechnicalIndicators.calculate_volatility(df, start_idx, end_idx)
-        if volatility >= self.volatility_threshold:
+        vol_limit = self.volatility_threshold * 1.5 if ongoing else self.volatility_threshold
+        if volatility >= vol_limit:
             return False
 
-        avg_volume_ratio = period_df['volume_ratio'].mean()
-        if avg_volume_ratio >= self.volume_ratio_threshold:
-            return False
+        if not ongoing:
+            avg_volume_ratio = period_df['volume_ratio'].mean()
+            if avg_volume_ratio >= self.volume_ratio_threshold:
+                return False
 
         return True
 

@@ -10,8 +10,8 @@ FACTORY_PATTERN = {
     'consolidation_days_min': 10,
     'consolidation_days_max': 40,
     'bandwidth': 0.30,
-    'volatility': 0.12,
-    'volume_ratio': 0.8,
+    'volatility': 0.18,
+    'volume_ratio': 1.5,
     'max_retrace_pct': 0.12,
     'ma_periods': [5, 10, 20, 60],
     'bb_period': 20,
@@ -25,7 +25,7 @@ SCAN = {
     'min_days': 60,
     'max_days_back': 180,
     'default_limit': 200,
-    'max_pattern_age_days': 30,
+    'max_pattern_age_days': 60,
 }
 
 MAIN_BOARD_PREFIXES = {
