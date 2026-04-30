@@ -2,7 +2,7 @@ import json
 import os
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, date as date_type
 from data.fetcher import DataFetcher
 from pattern.recognizer import PatternRecognizer
 from _config import FACTORY_PATTERN, SCAN, PROJECT_ROOT
@@ -170,6 +170,17 @@ class ScanEngine:
 
                 pattern = self.recognizer.find_pattern(
                     df, max_days_back=max_days_back or SCAN.get('max_days_back'))
+
+                if pattern:
+                    max_age = SCAN.get('max_pattern_age_days', 30)
+                    end_date_str = pattern.get('consolidation_end_date', '')
+                    if max_age and end_date_str:
+                        try:
+                            end_date = date_type.fromisoformat(str(end_date_str)[:10])
+                            if (date_type.today() - end_date).days > max_age:
+                                pattern = None
+                        except Exception:
+                            pass
 
                 if pattern:
                     pattern['stock_code'] = code

@@ -24,6 +24,7 @@ SCAN = {
     'min_days': 60,
     'max_days_back': 180,
     'default_limit': 200,
+    'max_pattern_age_days': 30,
 }
 
 MAIN_BOARD_PREFIXES = {
