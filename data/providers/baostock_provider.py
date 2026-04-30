@@ -2,13 +2,17 @@ from . import DataProvider
 import baostock as bs
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import List, Tuple
+from typing import List, Tuple, Optional
+from .cache import DataCache
 
 
 class BaostockProvider(DataProvider):
-    def __init__(self):
+    def __init__(self, use_cache: bool = True, cache_dir: str = None):
         self.bs = bs
         self._logged_in = False
+        self._cache = None
+        if use_cache:
+            self._cache = DataCache(cache_dir)
 
     def _ensure_login(self):
         if not self._logged_in:
@@ -78,7 +82,7 @@ class BaostockProvider(DataProvider):
         except Exception:
             return pd.DataFrame()
 
-    def get_daily_data(self, stock_code: str, days: int = 250) -> pd.DataFrame:
+    def _fetch_from_api(self, stock_code: str, days: int = 250) -> pd.DataFrame:
         self._ensure_login()
         bs_code = self._to_bs_code(stock_code)
         end_date = datetime.now().strftime('%Y-%m-%d')
@@ -122,6 +126,61 @@ class BaostockProvider(DataProvider):
 
         except Exception:
             return pd.DataFrame()
+
+    def get_daily_data(self, stock_code: str, days: int = 250) -> pd.DataFrame:
+        plain_code = self._format_stock_code(stock_code)
+
+        if self._cache is not None:
+            cached_df = self._cache.get(plain_code, max_age_days=1)
+            if cached_df is not None and not cached_df.empty:
+                if len(cached_df) >= days:
+                    return cached_df.tail(days).reset_index(drop=True)
+                return cached_df.reset_index(drop=True)
+
+        df = self._fetch_from_api(plain_code, days)
+
+        if self._cache is not None and not df.empty:
+            self._cache.set(plain_code, df)
+
+        if len(df) > days:
+            df = df.tail(days).reset_index(drop=True)
+
+        return df
+
+    def get_daily_data_incremental(self, stock_code: str, days: int = 250) -> pd.DataFrame:
+        plain_code = self._format_stock_code(stock_code)
+
+        if self._cache is not None:
+            latest_date = self._cache.get_latest_date(plain_code)
+
+            if latest_date is not None:
+                start_date = (datetime.strptime(latest_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+                end_date = datetime.now().strftime('%Y-%m-%d')
+
+                new_data = self.get_daily_data_in_range(plain_code, start_date, end_date)
+
+                if not new_data.empty:
+                    cached_df = self._cache.get(plain_code, max_age_days=30)
+                    if cached_df is not None and not cached_df.empty:
+                        combined = pd.concat([cached_df, new_data], ignore_index=True)
+                        combined = combined.drop_duplicates(subset=['date'], keep='last')
+                        combined = combined.sort_values('date').reset_index(drop=True)
+                        self._cache.set(plain_code, combined)
+                        df = combined
+                    else:
+                        df = new_data
+                else:
+                    cached_df = self._cache.get(plain_code, max_age_days=30)
+                    df = cached_df if cached_df is not None else pd.DataFrame()
+            else:
+                df = self.get_daily_data(plain_code, days)
+        else:
+            df = self._fetch_from_api(plain_code, days)
+
+        if len(df) > days:
+            df = df.tail(days).reset_index(drop=True)
+
+        return df
 
     def get_stock_list_with_names(self) -> List[Tuple[str, str]]:
         self._ensure_login()
@@ -183,24 +242,33 @@ class BaostockProvider(DataProvider):
         except Exception:
             return {}
 
+    def get_cache_stats(self) -> dict:
+        if self._cache is None:
+            return {'enabled': False}
+        return {**self._cache.get_stats(), 'enabled': True}
+
+    def clear_cache(self, stock_code: str = None):
+        if self._cache is not None:
+            self._cache.clear(stock_code)
+
     @staticmethod
     def _is_main_board_stock(code: str, name: str) -> bool:
         plain = code.split('.')[-1]
-        
+
         if plain.startswith('600') or plain.startswith('601') or plain.startswith('603') or plain.startswith('605'):
             return True
-        
+
         if plain.startswith('688'):
             return False
-        
+
         if plain.startswith('300') or plain.startswith('301'):
             return False
-        
+
         if plain.startswith('8') or plain.startswith('4'):
             return False
-        
+
         if plain.startswith('000') or plain.startswith('001') or plain.startswith('002'):
-            index_keywords = ['指数', '基金', '国债', '企债', '上证', '深证', '综指', 
+            index_keywords = ['指数', '基金', '国债', '企债', '上证', '深证', '综指',
                               '成指', 'A股', 'B股', '等权', '基本', '全指', '全R',
                               '沪公司', '沪企', '周期', '非周', '债', '成长', '价值',
                               '民企', '国企', '海外', '中盘', '小盘', '中小', '380',
@@ -217,5 +285,5 @@ class BaostockProvider(DataProvider):
             if len(name) >= 2 and not any(kw in name for kw in ['指数', '基金', '债']):
                 return True
             return False
-        
+
         return False

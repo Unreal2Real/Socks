@@ -4,10 +4,12 @@ from typing import List, Tuple
 
 
 class HybridProvider(DataProvider):
-    def __init__(self, tdx_path: str = 'C:/zd_zsone'):
+    def __init__(self, tdx_path: str = 'C:/zd_zsone', use_cache: bool = True):
         self.tdx_path = tdx_path
         self.tdx_reader = None
         self.quotes_client = None
+        self._baostock_provider = None
+        self._use_cache = use_cache
 
     def _init_tdx_reader(self):
         if self.tdx_reader is None:
@@ -25,9 +27,15 @@ class HybridProvider(DataProvider):
             except Exception:
                 self.quotes_client = None
 
+    def _get_baostock_provider(self):
+        if self._baostock_provider is None:
+            from .baostock_provider import BaostockProvider
+            self._baostock_provider = BaostockProvider(use_cache=self._use_cache)
+        return self._baostock_provider
+
     def get_daily_data(self, stock_code: str, days: int = 250) -> pd.DataFrame:
         self._init_tdx_reader()
-        
+
         if self.tdx_reader:
             try:
                 df = self.tdx_reader.daily(symbol=stock_code)
@@ -37,8 +45,9 @@ class HybridProvider(DataProvider):
                     return df.tail(days)
             except Exception:
                 pass
-        
-        return pd.DataFrame()
+
+        bs_provider = self._get_baostock_provider()
+        return bs_provider.get_daily_data(stock_code, days)
 
     def get_daily_data_in_range(self, stock_code: str,
                                  start_date: str, end_date: str) -> pd.DataFrame:
@@ -50,7 +59,7 @@ class HybridProvider(DataProvider):
 
     def get_minute_data(self, stock_code: str, count: int = 100) -> pd.DataFrame:
         self._init_quotes_client()
-        
+
         if self.quotes_client:
             try:
                 data = self.quotes_client.bars(symbol=stock_code, frequency=9, count=count)
@@ -58,12 +67,12 @@ class HybridProvider(DataProvider):
                     return data
             except Exception:
                 pass
-        
+
         return pd.DataFrame()
 
     def get_realtime_quote(self, stock_code: str) -> dict:
         self._init_quotes_client()
-        
+
         if self.quotes_client:
             try:
                 quote = self.quotes_client.quote(symbol=stock_code)
@@ -71,12 +80,12 @@ class HybridProvider(DataProvider):
                     return quote
             except Exception:
                 pass
-        
+
         return {}
 
     def get_stock_list_with_names(self) -> List[Tuple[str, str]]:
         self._init_tdx_reader()
-        
+
         if self.tdx_reader:
             try:
                 stocks = self.tdx_reader.stocks()
@@ -89,19 +98,17 @@ class HybridProvider(DataProvider):
                         return filtered
             except Exception:
                 pass
-        
-        from .baostock_provider import BaostockProvider
-        fallback = BaostockProvider()
+
+        bs_provider = self._get_baostock_provider()
         try:
-            result = fallback.get_stock_list_with_names()
-            fallback.close()
+            result = bs_provider.get_stock_list_with_names()
             return result
         except Exception:
             return []
 
     def get_stock_info(self, stock_code: str) -> dict:
         self._init_quotes_client()
-        
+
         if self.quotes_client:
             try:
                 quote = self.quotes_client.quote(symbol=stock_code)
@@ -114,27 +121,35 @@ class HybridProvider(DataProvider):
                     }
             except Exception:
                 pass
-        
+
         return {'code': stock_code, 'name': ''}
+
+    def get_cache_stats(self) -> dict:
+        bs_provider = self._get_baostock_provider()
+        return bs_provider.get_cache_stats()
+
+    def clear_cache(self, stock_code: str = None):
+        bs_provider = self._get_baostock_provider()
+        bs_provider.clear_cache(stock_code)
 
     @staticmethod
     def _is_main_board_stock(code: str, name: str) -> bool:
         plain = code.zfill(6)
-        
+
         if plain.startswith('600') or plain.startswith('601') or plain.startswith('603') or plain.startswith('605'):
             return True
-        
+
         if plain.startswith('688'):
             return False
-        
+
         if plain.startswith('300') or plain.startswith('301'):
             return False
-        
+
         if plain.startswith('8') or plain.startswith('4'):
             return False
-        
+
         if plain.startswith('000') or plain.startswith('001') or plain.startswith('002'):
-            index_keywords = ['指数', '基金', '国债', '企债', '上证', '深证', '综指', 
+            index_keywords = ['指数', '基金', '国债', '企债', '上证', '深证', '综指',
                               '成指', 'A股', 'B股', '等权', '基本', '全指', '全R',
                               '沪公司', '沪企', '周期', '非周', '债', '成长', '价值',
                               '民企', '国企', '海外', '中盘', '小盘', '中小', '380',
@@ -151,12 +166,17 @@ class HybridProvider(DataProvider):
             if len(name) >= 2 and not any(kw in name for kw in ['指数', '基金', '债']):
                 return True
             return False
-        
+
         return False
 
     def close(self):
         if self.quotes_client:
             try:
                 self.quotes_client.close()
+            except Exception:
+                pass
+        if self._baostock_provider:
+            try:
+                self._baostock_provider.close()
             except Exception:
                 pass
