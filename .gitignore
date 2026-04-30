@@ -3,6 +3,7 @@ __pycache__/
 *.pyo
 .DS_Store
 data/scan_state.db
+data/cache/
 results/
 report/
 data_cache/
