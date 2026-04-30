@@ -80,22 +80,37 @@ function createChart() {
   const el = document.getElementById('kline-chart');
   if (chart) { el.innerHTML = ''; chart = null; }
   chart = LightweightCharts.createChart(el, {
+    height: 500,
     layout: { background: { color: '#1a1d28' }, textColor: '#d1d4dc' },
     grid: { vertLines: { color: '#2a2d3a' }, horzLines: { color: '#2a2d3a' } },
-    crosshair: { mode: 0 }, rightPriceScale: { borderColor: '#2a2d3a' },
-    timeScale: { borderColor: '#2a2d3a', timeVisible: true }
+    crosshair: { mode: 1 },
+    rightPriceScale: { borderColor: '#2a2d3a', scaleMargins: { top: 0.05, bottom: 0.3 } },
+    timeScale: { borderColor: '#2a2d3a', timeVisible: true, rightOffset: 8 }
   });
+
   candleSeries = chart.addCandlestickSeries({
-    upColor: '#22c55e', downColor: '#ef4444', borderUpColor: '#22c55e',
-    borderDownColor: '#ef4444', wickUpColor: '#22c55e', wickDownColor: '#ef4444'
+    upColor: '#22c55e', downColor: '#ef4444',
+    borderUpColor: '#22c55e', borderDownColor: '#ef4444',
+    wickUpColor: '#22c55e', wickDownColor: '#ef4444',
   });
+
   volumeSeries = chart.addHistogramSeries({
-    priceFormat: { type: 'volume' }, priceScaleId: '',
+    priceFormat: { type: 'volume' },
+    priceScaleId: 'volume',
   });
-  chart.priceScale('').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-  volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+  chart.priceScale('volume').applyOptions({
+    scaleMargins: { top: 0.7, bottom: 0 },
+    borderColor: '#2a2d3a',
+    visible: true,
+    entireTextOnly: true,
+  });
+
   ['ma5','ma10','ma20'].forEach(k => {
-    lineSeries[k] = chart.addLineSeries({ color: k==='ma5'?'#f59e0b':k==='ma10'?'#3b82f6':'#a855f7', lineWidth: 1, priceScaleId: 'right' });
+    lineSeries[k] = chart.addLineSeries({
+      color: k==='ma5'?'#fbbf24':k==='ma10'?'#60a5fa':'#c084fc',
+      lineWidth: 1,
+      lineStyle: k==='ma5' ? 0 : (k==='ma10' ? 1 : 2),
+    });
   });
 }
 

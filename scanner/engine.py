@@ -57,7 +57,7 @@ class ScanEngine:
 
     def results(self) -> list:
         with self._lock:
-            return list(self._results)
+            return sorted(list(self._results), key=lambda x: x.get('pattern_score', 0), reverse=True)
 
     def _run(self, limit: int, max_days_back: int):
         stocks = self.fetcher.stock_list()
