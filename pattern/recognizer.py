@@ -18,6 +18,7 @@ class PatternRecognizer:
         self.volatility_threshold = config.get('volatility', 0.15)
         self.volume_ratio_threshold = config.get('volume_ratio', 0.5)
         self.uptrend_min_days = config.get('uptrend_min_days', 5)
+        self.max_retrace_pct = config.get('max_retrace_pct', 0.08)
 
     def find_pattern(self, df: pd.DataFrame,
                      max_days_back: int = None) -> Optional[dict]:
@@ -102,6 +103,13 @@ class PatternRecognizer:
         period_df = df.loc[start_idx:end_idx]
 
         if 'bb_bandwidth' not in period_df.columns:
+            return False
+
+        peak_price = period_df.iloc[0]['close']
+        min_close = period_df['close'].min()
+
+        retrace = (peak_price - min_close) / peak_price
+        if retrace > self.max_retrace_pct:
             return False
 
         avg_bandwidth = period_df['bb_bandwidth'].mean()
