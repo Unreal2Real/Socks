@@ -125,16 +125,17 @@ def stock_realtime():
 
 @app.route('/api/scan/progress')
 def scan_progress():
-    def generate():
-        limit = int(request.args.get('limit', 0))
+    limit = int(request.args.get('limit', 0))
+    
+    def generate_scan(limit_val):
         config = make_config({})
 
         provider = create_provider_with_fallback()
         try:
             stocks = provider.get_stock_list_with_names()
             total = len(stocks)
-            if limit > 0:
-                stocks = stocks[:limit]
+            if limit_val > 0:
+                stocks = stocks[:limit_val]
 
             matched = []
             count = 0
@@ -142,7 +143,7 @@ def scan_progress():
             log_interval = 0.3
             start_time = time.time()
 
-            yield f"event: start\ndata: {{'type':'start','total':{total},'limit':{limit}}}\n\n"
+            yield f"event: start\ndata: {{'type':'start','total':{total},'limit':{limit_val}}}\n\n"
 
             for code, name in stocks:
                 try:
@@ -190,7 +191,7 @@ def scan_progress():
         finally:
             provider.close()
 
-    return Response(generate(), mimetype='text/event-stream', headers={
+    return Response(generate_scan(limit), mimetype='text/event-stream', headers={
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
         'X-Accel-Buffering': 'no'
