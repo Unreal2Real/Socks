@@ -568,7 +568,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
       </div>
       <div class="btn-group">
         <button class="btn btn-primary" style="flex:1;" id="btnScan">▶ 开始扫描</button>
-        <button class="btn btn-secondary">⏹ 停止</button>
+        <button class="btn btn-secondary" id="btnStop" disabled>⏹ 停止</button>
       </div>
     </div>
   </div>
@@ -654,8 +654,8 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 // ============================================================
 const API = '';
 
-async function apiGet(url) {
-  const r = await fetch(API + url);
+async function apiGet(url, signal) {
+  const r = await fetch(API + url, { signal });
   if (!r.ok) throw new Error('network error');
   return r.json();
 }
@@ -678,14 +678,27 @@ async function loadStockList() {
 // ============================================================
 // SCAN
 // ============================================================
+let _scanAbort = null;
+
+document.getElementById('btnStop').addEventListener('click', () => {
+  if (_scanAbort) {
+    _scanAbort.abort();
+    document.getElementById('btnStop').disabled = true;
+  }
+});
+
 async function runScan() {
   const btn = document.getElementById('btnScan');
+  const btnStop = document.getElementById('btnStop');
   const tbody = document.querySelector('#scanResultTable tbody');
   const status = document.getElementById('scanStatus');
   const progress = document.getElementById('scanProgress');
   const logPanel = document.getElementById('scanLog');
 
+  const abort = new AbortController();
+  _scanAbort = abort;
   btn.disabled = true;
+  btnStop.disabled = false;
   btn.textContent = '🔄 扫描中…';
   status.textContent = '正在扫描…';
   progress.classList.add('indeterminate');
@@ -695,7 +708,7 @@ async function runScan() {
 
   try {
     const startTime = Date.now();
-    const json = await apiGet('/api/scan');
+    const json = await apiGet('/api/scan', abort.signal);
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
     if (json.code !== 0) throw new Error(json.msg);
@@ -729,14 +742,22 @@ async function runScan() {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">未发现匹配形态</td></tr>';
     }
   } catch (e) {
-    progress.classList.remove('indeterminate');
-    progress.style.width = '0%';
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--red);">扫描失败：${e.message}</td></tr>`;
-    status.textContent = '扫描失败';
-    logPanel.innerHTML = `<div class="log-line warn">✗ 扫描失败：${e.message}</div>`;
+    if (e.name === 'AbortError') {
+      status.textContent = '扫描已取消';
+      logPanel.innerHTML = `<div class="log-line warn">⏹ 扫描已取消</div>`;
+    } else {
+      progress.classList.remove('indeterminate');
+      progress.style.width = '0%';
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--red);">扫描失败：${e.message}</td></tr>`;
+      status.textContent = '扫描失败';
+      logPanel.innerHTML = `<div class="log-line warn">✗ 扫描失败：${e.message}</div>`;
+    }
   } finally {
     btn.disabled = false;
+    btnStop.disabled = true;
     btn.textContent = '▶ 开始扫描';
+    _scanAbort = null;
+    progress.classList.remove('indeterminate');
   }
 }
 
@@ -1008,19 +1029,6 @@ window.addEventListener('load', () => {
 });
 
 document.getElementById('btnScan').addEventListener('click', runScan);
-
-// Static scan result rows → navigate to stock analysis
-document.querySelectorAll('#scanResultTable tbody .clickable-row').forEach(tr => {
-  tr.addEventListener('click', () => {
-    const code = tr.dataset.code;
-    const name = tr.dataset.name;
-    document.getElementById('stockCode').value = code;
-    document.getElementById('stockName').textContent = name;
-    document.getElementById('stockCodeDisplay').textContent = code;
-    navigateTo('stock');
-    loadMainChart(code);
-  });
-});
 </script>
 </body>
 </html>
