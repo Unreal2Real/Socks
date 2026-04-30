@@ -220,6 +220,11 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
 .progress-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
 .progress-bar { height: 4px; background: #E8E8ED; border-radius: 2px; overflow: hidden; }
 .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s ease; }
+.progress-fill.indeterminate { width: 30% !important; animation: progress-indeterminate 1.5s ease infinite; }
+@keyframes progress-indeterminate {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
 
 /* Log */
 .log-panel {
@@ -580,15 +585,9 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
     </div>
     <div class="card-body">
       <div class="progress-meta"><span>扫描进度</span><span id="scanStatus">就绪</span></div>
-      <div class="progress-bar"><div class="progress-fill" style="width:100%;"></div></div>
+      <div class="progress-bar"><div class="progress-fill" id="scanProgress" style="width:0%;"></div></div>
 
-      <div class="log-panel">
-        <div class="log-line ok">[17:22:01] ✓ 扫描开始</div>
-        <div class="log-line">[17:22:02]   加载股票列表: 5318 只</div>
-        <div class="log-line ok">[17:22:06] ✓ 603135 中重科技 [匹配] score=0.85</div>
-        <div class="log-line warn">[17:22:08] → 600188 兖矿能源 [观察] score=0.91</div>
-        <div class="log-line ok">[17:22:42] ✓ 扫描完成 · 500只 · 19匹配 · 耗时 41s</div>
-      </div>
+      <div class="log-panel" id="scanLog"></div>
 
       <div class="table-wrap" style="margin-top:12px;">
         <table id="scanResultTable">
@@ -599,31 +598,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
             </tr>
           </thead>
           <tbody>
-            <tr class="clickable-row" data-code="603135" data-name="中重科技" data-phase="0">
-              <td><code>603135</code></td><td>中重科技</td>
-              <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:85%;background:var(--accent);"></span></span><span class="score-text" style="color:var(--accent);">0.85</span></span></td>
-              <td style="color:var(--red);">+15.4%</td><td>14天</td><td><span class="tag tag-green">已匹配</span></td>
-            </tr>
-            <tr class="clickable-row" data-code="301439" data-name="泓淋电力" data-phase="1">
-              <td><code>301439</code></td><td>泓淋电力</td>
-              <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:82%;background:var(--accent);"></span></span><span class="score-text" style="color:var(--accent);">0.82</span></span></td>
-              <td style="color:var(--red);">+15.3%</td><td>13天</td><td><span class="tag tag-green">已匹配</span></td>
-            </tr>
-            <tr class="clickable-row" data-code="600831" data-name="广电网络" data-phase="2">
-              <td><code>600831</code></td><td>广电网络</td>
-              <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:78%;background:var(--accent);"></span></span><span class="score-text" style="color:var(--accent);">0.78</span></span></td>
-              <td style="color:var(--red);">+18.5%</td><td>19天</td><td><span class="tag tag-green">已匹配</span></td>
-            </tr>
-            <tr class="clickable-row" data-code="600054" data-name="黄山旅游" data-phase="3">
-              <td><code>600054</code></td><td>黄山旅游</td>
-              <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:95%;background:var(--orange);"></span></span><span class="score-text" style="color:var(--orange);">0.95</span></span></td>
-              <td style="color:var(--red);">+26.3%</td><td>52天</td><td><span class="tag tag-orange">观察中</span></td>
-            </tr>
-            <tr class="clickable-row" data-code="600188" data-name="兖矿能源" data-phase="4">
-              <td><code>600188</code></td><td>兖矿能源</td>
-              <td><span class="score-bar-wrap"><span class="score-bar-track"><span class="score-bar-fill" style="width:91%;background:var(--orange);"></span></span><span class="score-text" style="color:var(--orange);">0.91</span></span></td>
-              <td style="color:var(--red);">+60.3%</td><td>33天</td><td><span class="tag tag-orange">观察中</span></td>
-            </tr>
+            <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">点击「开始扫描」进行全市场检测</td></tr>
           </tbody>
         </table>
       </div>
@@ -707,18 +682,28 @@ async function runScan() {
   const btn = document.getElementById('btnScan');
   const tbody = document.querySelector('#scanResultTable tbody');
   const status = document.getElementById('scanStatus');
+  const progress = document.getElementById('scanProgress');
+  const logPanel = document.getElementById('scanLog');
 
   btn.disabled = true;
   btn.textContent = '🔄 扫描中…';
   status.textContent = '正在扫描…';
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">⏳ 正在从全市场扫描，请稍候…</td></tr>';
+  progress.classList.add('indeterminate');
+  logPanel.innerHTML = `<div class="log-line ok">扫描开始，全市场检测中…</div>`;
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">⏳ 扫描中，请稍候…</td></tr>';
   document.getElementById('scanStockDetail').style.display = 'none';
 
   try {
+    const startTime = Date.now();
     const json = await apiGet('/api/scan');
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
     if (json.code !== 0) throw new Error(json.msg);
 
+    progress.classList.remove('indeterminate');
+    progress.style.width = '100%';
     status.textContent = `扫描完成：全市场 ${json.total} 只，发现 ${json.matched_count} 只匹配形态`;
+    logPanel.innerHTML = `<div class="log-line ok">✓ 扫描完成 · ${json.total}只 · ${json.matched_count}匹配 · 耗时 ${elapsed}s</div>`;
     tbody.innerHTML = '';
 
     json.matched.forEach(p => {
@@ -726,7 +711,6 @@ async function runScan() {
       tr.className = 'clickable-row';
       tr.dataset.code = p.stock_code;
       tr.dataset.name = p.stock_name;
-      tr.dataset.phaseIdx = 0;
       tr.innerHTML = `
         <td><code>${p.stock_code}</code></td>
         <td>${p.stock_name}</td>
@@ -745,8 +729,11 @@ async function runScan() {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">未发现匹配形态</td></tr>';
     }
   } catch (e) {
+    progress.classList.remove('indeterminate');
+    progress.style.width = '0%';
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--red);">扫描失败：${e.message}</td></tr>`;
     status.textContent = '扫描失败';
+    logPanel.innerHTML = `<div class="log-line warn">✗ 扫描失败：${e.message}</div>`;
   } finally {
     btn.disabled = false;
     btn.textContent = '▶ 开始扫描';
