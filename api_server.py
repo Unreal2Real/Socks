@@ -7,7 +7,7 @@ from flask_cors import CORS
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from data.fetcher import DataFetcher
+from data.providers.factory import create_provider_with_fallback
 from indicators.technical import TechnicalIndicators
 from patterns.factory_pattern import FactoryPatternRecognizer
 from config.settings import FACTORY_PATTERN_CONFIG, TRADING_CONFIG
@@ -36,12 +36,12 @@ def health():
 
 @app.route('/api/stock/list')
 def stock_list():
-    fetcher = DataFetcher()
+    provider = create_provider_with_fallback()
     try:
-        stocks = fetcher.get_stock_list_with_names()
+        stocks = provider.get_stock_list_with_names()
         return jsonify({'code': 0, 'data': [{'code': c, 'name': n} for c, n in stocks]})
     finally:
-        fetcher.close()
+        provider.close()
 
 
 @app.route('/api/stock/daily')
@@ -51,9 +51,9 @@ def stock_daily():
     if not code:
         return jsonify({'code': 1, 'msg': '缺少code参数'})
 
-    fetcher = DataFetcher()
+    provider = create_provider_with_fallback()
     try:
-        df = fetcher.get_daily_data(code, days=days)
+        df = provider.get_daily_data(code, days=days)
         if df.empty:
             return jsonify({'code': 1, 'msg': '无数据'})
 
@@ -74,7 +74,7 @@ def stock_daily():
             })
         return jsonify({'code': 0, 'data': data})
     finally:
-        fetcher.close()
+        provider.close()
 
 
 @app.route('/api/stock/intraday')
@@ -84,181 +84,180 @@ def stock_intraday():
     if not code:
         return jsonify({'code': 1, 'msg': '缺少code参数'})
 
-    fetcher = DataFetcher()
+    provider = create_provider_with_fallback()
     try:
-        bs_code = fetcher._to_bs_code(fetcher._format_stock_code(code))
-        rs = fetcher._query(
-            bs_code,
-            "date,time,open,high,low,close,volume",
-            start_date=date,
-            end_date=date,
-            frequency="5"
-        )
-        rows = []
-        while rs.next():
-            rows.append(rs.get_row_data())
-
-        if not rows:
-            return jsonify({'code': 0, 'data': []})
+        df = provider.get_minute_data(code, count=100)
+        if df.empty:
+            return jsonify({'code': 1, 'msg': '无分时数据'})
 
         data = []
-        for row in rows:
-            if len(row) < 6 or not row[1]:
-                continue
-            try:
-                price = float(row[5]) if row[5] not in ('', 'None') else 0
-                data.append({
-                    'time': f"{row[0]} {row[1][:4]}",
-                    'value': price,
-                    'open': float(row[2]) if row[2] not in ('', 'None') else price,
-                    'high': float(row[3]) if row[3] not in ('', 'None') else price,
-                    'low': float(row[4]) if row[4] not in ('', 'None') else price,
-                    'close': price,
-                    'volume': float(row[6]) if row[6] not in ('', 'None') else 0,
-                })
-            except (ValueError, TypeError):
-                continue
-
+        for _, row in df.iterrows():
+            data.append({
+                'time': str(row.get('time', '')),
+                'open': float(row.get('open', 0)),
+                'high': float(row.get('high', 0)),
+                'low': float(row.get('low', 0)),
+                'close': float(row.get('close', 0)),
+                'volume': float(row.get('volume', 0)),
+            })
         return jsonify({'code': 0, 'data': data})
-    except Exception as e:
-        return jsonify({'code': 1, 'msg': str(e)})
     finally:
-        fetcher.close()
+        provider.close()
 
 
-@app.route('/api/stock/pattern')
-def stock_pattern():
+@app.route('/api/stock/realtime')
+def stock_realtime():
     code = request.args.get('code', '').strip()
     if not code:
         return jsonify({'code': 1, 'msg': '缺少code参数'})
 
-    overrides = {}
-    for k in ['uptrend_gain', 'consolidation_days_min', 'consolidation_days_max',
-              'bandwidth', 'volatility', 'volume_ratio']:
-        v = request.args.get(k)
-        if v is not None:
-            try:
-                overrides[k] = float(v)
-            except ValueError:
-                pass
-
-    cfg = make_config(overrides)
-    fetcher = DataFetcher()
+    provider = create_provider_with_fallback()
     try:
-        df = fetcher.get_daily_data(code, days=TRADING_CONFIG['data_days'])
-        if df.empty or len(df) < 60:
-            return jsonify({'code': 1, 'msg': '数据不足'})
-
-        df = TechnicalIndicators.calculate_all(df)
-        recognizer = FactoryPatternRecognizer(cfg)
-        all_phases = []
-
-        for i in range(20, len(df) - cfg.get('consolidation_days_max', 40) - 1):
-            if recognizer._is_uptrend_start(df, i):
-                uptrend_result = recognizer._scan_uptrend(df, i)
-                if uptrend_result:
-                    uptrend_end_idx, uptrend_gain = uptrend_result
-                    consolidation_result = recognizer._scan_consolidation(df, uptrend_end_idx)
-                    if consolidation_result:
-                        consol_end_idx, consol_days = consolidation_result
-                        score = recognizer._calculate_pattern_score(
-                            df, i, uptrend_end_idx, consol_end_idx)
-
-                        def fmt(idx):
-                            d = df.loc[idx, 'date']
-                            return d.strftime('%Y-%m-%d') if hasattr(d, 'strftime') else str(d)[:10]
-
-                        all_phases.append({
-                            'phase_index': len(all_phases),
-                            'uptrend_start': fmt(i),
-                            'uptrend_end': fmt(uptrend_end_idx),
-                            'consolidation_end': fmt(consol_end_idx),
-                            'uptrend_gain': round(uptrend_gain, 4),
-                            'consolidation_days': consol_days,
-                            'pattern_score': round(score, 4),
-                            'uptrend_start_idx': int(i),
-                            'uptrend_end_idx': int(uptrend_end_idx),
-                            'consolidation_end_idx': int(consol_end_idx),
-                        })
-
-        return jsonify({'code': 0, 'data': all_phases})
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'code': 1, 'msg': str(e)})
+        quote = provider.get_realtime_quote(code)
+        if not quote:
+            return jsonify({'code': 1, 'msg': '无法获取实时报价'})
+        
+        return jsonify({'code': 0, 'data': quote})
     finally:
-        fetcher.close()
+        provider.close()
 
 
-@app.route('/api/scan')
+@app.route('/api/scan', methods=['GET', 'POST'])
 def scan():
-    from multiprocessing.pool import ThreadPool
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        limit = data.get('limit', 0)
+        batch_size = data.get('batch_size', 50)
+        config_overrides = data.get('config', {})
+    else:
+        limit = int(request.args.get('limit', 0))
+        batch_size = int(request.args.get('batch_size', 50))
+        config_overrides = {}
 
-    fetcher = DataFetcher()
-    all_stocks = fetcher.get_stock_list_with_names()
-    total = len(all_stocks)
-
-    candidates = [(c, n) for c, n in all_stocks if not ('ST' in n or '*ST' in n)]
-
-    def process_one(item):
-        code, name = item
-        if 'ST' in name or '*ST' in name:
-            return {'code': code, 'name': name, 'status': 'no_pattern', 'score': 0, 'notes': 'ST'}, None
-        try:
-            f = DataFetcher()
-            df = f.get_daily_data(code, days=TRADING_CONFIG['data_days'])
-            if len(df) < 60:
-                return {'code': code, 'name': name, 'status': 'no_pattern', 'score': 0, 'notes': '数据不足'}, None
-
-            from filters.stock_filter import StockFilter
-            if not StockFilter.apply_filters(df, stock_info={'name': name}):
-                return {'code': code, 'name': name, 'status': 'no_pattern', 'score': 0, 'notes': '过滤淘汰'}, None
-
-            df = TechnicalIndicators.calculate_all(df)
-            recognizer = FactoryPatternRecognizer(FACTORY_PATTERN_CONFIG)
-            pattern = recognizer.find_pattern(df)
-
-            if pattern:
-                pattern['stock_code'] = code
-                pattern['stock_name'] = name
-                for key in ['uptrend_start_date', 'uptrend_end_date',
-                            'consolidation_start_date', 'consolidation_end_date']:
-                    if key in pattern and hasattr(pattern[key], 'strftime'):
-                        pattern[key] = str(pattern[key])
-                return {'code': code, 'name': name,
-                        'status': 'matched', 'score': pattern.get('pattern_score', 0),
-                        'notes': f'涨幅{pattern.get("uptrend_gain", 0):.1%} 盘整{pattern.get("consolidation_days", 0)}天',
-                        'pattern_data': pattern}, pattern
-
-            proximity = recognizer.classify_pattern_proximity(df)
-            return {'code': code, 'name': name,
-                    'status': proximity['status'],
-                    'score': proximity.get('score', 0),
-                    'notes': proximity.get('notes', '')}, None
-        except Exception as e:
-            return {'code': code, 'name': name, 'status': 'error', 'score': 0, 'notes': str(e)[:80]}, None
-
-    matched = []
-    updates = []
-
+    config = make_config(config_overrides)
+    
+    provider = create_provider_with_fallback()
     try:
-        with ThreadPool(processes=6) as pool:
-            for r, pat in pool.imap(process_one, candidates):
-                updates.append(r)
-                if pat:
-                    matched.append(pat)
+        stocks = provider.get_stock_list_with_names()
+        if limit > 0:
+            stocks = stocks[:limit]
+        
+        results = []
+        count = 0
+        
+        for code, name in stocks:
+            if count >= batch_size and batch_size > 0:
+                break
+            
+            try:
+                df = provider.get_daily_data(code, days=config.get('min_days', 60))
+                if df.empty or len(df) < config.get('min_days', 60):
+                    continue
+                
+                recognizer = FactoryPatternRecognizer(df, config)
+                pattern = recognizer.recognize()
+                
+                if pattern['matched']:
+                    results.append({
+                        'code': code,
+                        'name': name,
+                        'score': pattern['score'],
+                        'type': pattern['type'],
+                        'days': len(df),
+                        'latest_date': df['date'].max().strftime('%Y-%m-%d')
+                    })
+            except Exception as e:
+                pass
+            
+            count += 1
+        
+        return jsonify({
+            'code': 0,
+            'data': results,
+            'scanned': count,
+            'total': len(stocks)
+        })
     finally:
-        fetcher.close()
+        provider.close()
 
-    return jsonify({
-        'code': 0,
-        'total': total,
-        'matched_count': len(matched),
-        'matched': matched,
-        'updates': updates,
-    })
+
+@app.route('/api/backtest', methods=['GET', 'POST'])
+def backtest():
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        stock_code = data.get('code', '')
+        start_date = data.get('start', '')
+        end_date = data.get('end', '')
+    else:
+        stock_code = request.args.get('code', '')
+        start_date = request.args.get('start', '')
+        end_date = request.args.get('end', '')
+
+    if not stock_code:
+        return jsonify({'code': 1, 'msg': '缺少code参数'})
+
+    provider = create_provider_with_fallback()
+    try:
+        if start_date and end_date:
+            df = provider.get_daily_data_in_range(stock_code, start_date, end_date)
+        else:
+            df = provider.get_daily_data(stock_code, days=500)
+
+        if df.empty:
+            return jsonify({'code': 1, 'msg': '无数据'})
+
+        indicators = TechnicalIndicators(df)
+        df = indicators.add_all()
+
+        result = {
+            'code': stock_code,
+            'start_date': df['date'].min().strftime('%Y-%m-%d'),
+            'end_date': df['date'].max().strftime('%Y-%m-%d'),
+            'total_days': len(df),
+            'total_return': ((df['close'].iloc[-1] - df['close'].iloc[0]) / df['close'].iloc[0] * 100),
+            'max_drawdown': 0,
+            'data': []
+        }
+
+        for _, row in df.iterrows():
+            result['data'].append({
+                'date': row['date'].strftime('%Y-%m-%d'),
+                'close': float(row['close']),
+                'ma5': float(row.get('ma5', 0)),
+                'ma10': float(row.get('ma10', 0)),
+                'ma20': float(row.get('ma20', 0)),
+                'volume': float(row['volume'])
+            })
+
+        return jsonify({'code': 0, 'data': result})
+    finally:
+        provider.close()
+
+
+@app.route('/api/cache/stats')
+def cache_stats():
+    provider = create_provider_with_fallback()
+    try:
+        stats = provider.get_cache_stats()
+        return jsonify({'code': 0, 'data': stats})
+    finally:
+        provider.close()
+
+
+@app.route('/api/cache/clear', methods=['POST'])
+def cache_clear():
+    data = request.get_json() or {}
+    stock_code = data.get('code', None)
+    
+    provider = create_provider_with_fallback()
+    try:
+        provider.clear_cache(stock_code)
+        return jsonify({'code': 0, 'msg': '缓存已清除'})
+    finally:
+        provider.close()
 
 
 if __name__ == '__main__':
-    print('启动 API 服务 http://localhost:5555')
-    app.run(host='0.0.0.0', port=5555, debug=False, threaded=True)
+    port = int(os.environ.get('PORT', 5555))
+    print(f"启动 API 服务 http://localhost:{port}")
+    app.run(host='0.0.0.0', port=port, debug=False)

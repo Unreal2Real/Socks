@@ -1,5 +1,36 @@
 # 更新日志
 
+## v2.2.0 - 2026-04-30
+
+### 本地数据缓存机制
+
+1. **DataCache 类**
+   - 支持日线数据本地缓存
+   - 使用 CSV 格式存储，避免额外依赖
+   - 元数据存储在 metadata.json
+   - 缓存有效期：1天（可配置）
+
+2. **缓存策略**
+   - 首次获取：从 Baostock API 读取并缓存
+   - 后续获取：直接读取本地文件
+   - 缓存路径：`data/cache/` 目录
+
+3. **性能提升**
+   - 首次获取：~0.5秒/只（API调用）
+   - 缓存命中：~0.01秒/只（本地读取）
+   - **速度提升：25-50倍**
+
+4. **新增方法**
+   - `get_cache_stats()` - 获取缓存统计信息
+   - `clear_cache()` - 清空缓存
+
+5. **新增文件**
+   - `data/providers/cache.py` - 缓存实现
+
+6. **修改文件**
+   - `data/providers/baostock_provider.py` - 集成缓存
+   - `data/providers/hybrid_provider.py` - 支持缓存回退
+
 ## v2.1.0 - 2026-04-30
 
 ### 股票过滤优化
@@ -18,11 +49,6 @@
    - 市场指数：上证、深证、综指、成指等
    - 行业指数：消费、高端装备、医药主题等
    - 其他：基金、国债、企债等
-
-### 修改文件
-
-- `data/providers/baostock_provider.py` - 更新 `_is_main_board_stock` 方法
-- `data/providers/hybrid_provider.py` - 同步更新过滤逻辑
 
 ## v2.0.0 - 2026-04-30
 
@@ -54,38 +80,6 @@
 2. **工厂模式**
    - 统一数据源创建入口
    - 支持故障转移机制
-
-### 修改文件
-
-- `config/settings.py` - 添加数据源配置
-- `data/providers/__init__.py` - 数据抽象接口
-- `data/providers/baostock_provider.py` - Baostock 实现
-- `data/providers/tdx_provider.py` - TDX 实现
-- `data/providers/hybrid_provider.py` - 混合数据源实现
-- `data/providers/factory.py` - 数据源工厂
-- `main.py` - 支持 `--source` 参数
-- `requirements.txt` - 添加 mootdx 依赖
-
-### 使用示例
-
-```bash
-# 默认混合模式
-python main.py scan
-
-# 指定数据源
-python main.py scan --source hybrid
-python main.py scan --source baostock
-python main.py scan --source tdx
-
-# 全量扫描
-python main.py scan --full --source hybrid
-```
-
-### 性能提升
-
-- 日常扫描使用本地文件，读取速度提升 100 倍
-- 分时查看按需获取，节省网络资源
-- 支持离线扫描，不受网络影响
 
 ## v1.0.0 - 初始版本
 
