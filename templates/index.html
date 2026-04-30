@@ -122,12 +122,12 @@ async function analyzeStock() {
     const r = await fetch(`/api/stock/${code}?days=500`);
     const j = await r.json();
     if (j.code !== 0) return alert(j.msg);
-    renderKline(j.data);
+    renderKline(j.data, j.pattern);
     renderPattern(j.pattern);
   } catch(e) { alert('加载失败: '+e.message); }
 }
 
-function renderKline(data) {
+function renderKline(data, pattern) {
   if (!chart) createChart();
   const candles = [], volumes = [], maData = {ma5:[],ma10:[],ma20:[]};
   data.forEach((d,i) => {
@@ -137,6 +137,37 @@ function renderKline(data) {
   });
   candleSeries.setData(candles);
   volumeSeries.setData(volumes);
+
+  const markers = [];
+  if (pattern) {
+    const toTime = s => s.includes('-') ? s : s.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3');
+    markers.push({
+      time: toTime(pattern.uptrend_start_date),
+      position: 'belowBar',
+      color: '#fbbf24',
+      shape: 'arrowUp',
+      text: '上涨起点',
+      size: 3,
+    });
+    markers.push({
+      time: toTime(pattern.uptrend_end_date),
+      position: 'aboveBar',
+      color: '#f97316',
+      shape: 'circle',
+      text: '盘整起点',
+      size: 3,
+    });
+    markers.push({
+      time: toTime(pattern.consolidation_end_date),
+      position: 'belowBar',
+      color: '#22c55e',
+      shape: 'arrowUp',
+      text: '突破',
+      size: 3,
+    });
+  }
+  candleSeries.setMarkers(markers);
+
   for (let i = 0; i < data.length; i++) {
     const t = data[i].time.includes('-') ? data[i].time : data[i].time.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3');
     for (let p of [5,10,20]) {
