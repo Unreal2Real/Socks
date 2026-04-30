@@ -1,3 +1,9 @@
+DATA_SOURCE_CONFIG = {
+    'default': 'baostock',
+    'tdx_path': 'C:/zd_zsone/T0002/hq_cache',
+    'fallback_enabled': True,
+}
+
 FACTORY_PATTERN_CONFIG = {
     'uptrend_gain': 0.15,
     'consolidation_days_min': 10,

@@ -10,14 +10,14 @@ from config.settings import FACTORY_PATTERN_CONFIG, TRADING_CONFIG
 BATCH_SIZE = 80
 
 
-def _process_single_stock(fetcher, stock_code, stock_name):
+def _process_single_stock(provider, stock_code, stock_name):
     if 'ST' in stock_name or '*ST' in stock_name:
         return {'code': stock_code, 'name': stock_name,
                 'status': 'no_pattern', 'score': 0,
                 'notes': 'ST'}, None
 
     try:
-        df = fetcher.get_daily_data(stock_code, days=TRADING_CONFIG['data_days'])
+        df = provider.get_daily_data(stock_code, days=TRADING_CONFIG['data_days'])
         if len(df) < 60:
             return {'code': stock_code, 'name': stock_name,
                     'status': 'no_pattern', 'score': 0,
@@ -62,14 +62,14 @@ def _process_single_stock(fetcher, stock_code, stock_name):
 
 
 def _scan_batch(args):
-    batch_id, stocks = args
-    from data.fetcher import DataFetcher
-    fetcher = DataFetcher()
+    batch_id, stocks, source_type = args
+    from data.providers.factory import create_provider
+    provider = create_provider(source_type)
     try:
         state_updates = []
         matches = []
         for stock_code, stock_name in stocks:
-            state_info, pattern = _process_single_stock(fetcher, stock_code, stock_name)
+            state_info, pattern = _process_single_stock(provider, stock_code, stock_name)
             state_updates.append(state_info)
             if pattern:
                 matches.append(pattern)
@@ -79,7 +79,7 @@ def _scan_batch(args):
                                 'score': 0, 'notes': 'batch error'} for c, n in stocks]
     finally:
         try:
-            fetcher.close()
+            provider.close()
         except Exception:
             pass
 
@@ -105,78 +105,83 @@ def save_results(results: list, output_dir: str = 'results', prefix: str = 'patt
 
 
 def cmd_scan(args):
-    from data.fetcher import DataFetcher
+    from data.providers.factory import create_provider_with_fallback
     from data.scan_state import ScanState
 
     num_workers = args.workers or 3
     state = ScanState()
-    fetcher = DataFetcher()
 
-    print("获取股票列表...")
-    all_stocks = fetcher.get_stock_list_with_names()
-    print(f"全量股票: {len(all_stocks)} 只")
-    fetcher.close()
+    print(f"使用数据源: {args.source}")
+    provider = create_provider_with_fallback()
 
-    if args.limit:
-        all_stocks = all_stocks[:args.limit]
-        scan_list = all_stocks
-    elif args.full:
-        scan_list = all_stocks
-        print(">>> 全量扫描模式 - 检查所有股票")
-    else:
-        scan_list = state.get_daily_scan_list(all_stocks)
-        skipped = len(all_stocks) - len(scan_list)
-        print(f">>> 增量扫描模式 - 需扫描 {len(scan_list)} 只 (跳过 {skipped} 只)")
+    try:
+        print("获取股票列表...")
+        all_stocks = provider.get_stock_list_with_names()
+        print(f"全量股票: {len(all_stocks)} 只")
+
+        if args.limit:
+            all_stocks = all_stocks[:args.limit]
+            scan_list = all_stocks
+        elif args.full:
+            scan_list = all_stocks
+            print(">>> 全量扫描模式 - 检查所有股票")
+        else:
+            scan_list = state.get_daily_scan_list(all_stocks)
+            skipped = len(all_stocks) - len(scan_list)
+            print(f">>> 增量扫描模式 - 需扫描 {len(scan_list)} 只 (跳过 {skipped} 只)")
+            state.print_summary()
+
+        if not scan_list:
+            print("今天没有需要扫描的股票，休息一下！")
+            return
+
+        batches = []
+        for i in range(0, len(scan_list), BATCH_SIZE):
+            batches.append((i // BATCH_SIZE, scan_list[i:i + BATCH_SIZE], args.source))
+
+        total = len(scan_list)
+        print(f"\n开始扫描 (workers: {num_workers}, batch_size: {BATCH_SIZE}, batches: {len(batches)})...")
+        print("-" * 60)
+
+        results = []
+        all_updates = []
+        completed = 0
+
+        with Pool(processes=num_workers) as pool:
+            for batch_id, batch_results, batch_updates in pool.imap_unordered(_scan_batch, batches):
+                completed += BATCH_SIZE
+                completed = min(completed, total)
+                print(f"进度: {completed}/{total} ({completed/total*100:.1f}%)")
+
+                for r in batch_results:
+                    results.append(r)
+                    print(f"  🎯 发现形态: {r.get('stock_code', '?')} ({r.get('stock_name', '')}) "
+                          f"- 涨幅: {r.get('uptrend_gain', 0):.2%}, "
+                          f"盘整: {r.get('consolidation_days', 0)}天, "
+                          f"评分: {r.get('pattern_score', 0):.2f}")
+                all_updates.extend(batch_updates)
+
+        state.batch_update_status(all_updates)
+
+        print("-" * 60)
+        n_matched = sum(1 for u in all_updates if u['status'] == 'matched')
+        n_watch_consol = sum(1 for u in all_updates if u['status'] == 'watching_consolidation')
+        n_watch_up = sum(1 for u in all_updates if u['status'] == 'watching_uptrend')
+        n_error = sum(1 for u in all_updates if u['status'] == 'error')
+        print(f"\n扫描完成! 发现 {len(results)} 只\"厂\"字形态股票.")
+        print(f"  新增观察-盘整中: {n_watch_consol} 只")
+        print(f"  新增观察-上涨中: {n_watch_up} 只")
+        print(f"  错误: {n_error} 只")
+
+        if results:
+            json_path = save_results(results, args.output)
+            _auto_report(json_path)
+
+        print()
         state.print_summary()
 
-    if not scan_list:
-        print("今天没有需要扫描的股票，休息一下！")
-        return
-
-    batches = []
-    for i in range(0, len(scan_list), BATCH_SIZE):
-        batches.append((i // BATCH_SIZE, scan_list[i:i + BATCH_SIZE]))
-
-    total = len(scan_list)
-    print(f"\n开始扫描 (workers: {num_workers}, batch_size: {BATCH_SIZE}, batches: {len(batches)})...")
-    print("-" * 60)
-
-    results = []
-    all_updates = []
-    completed = 0
-
-    with Pool(processes=num_workers) as pool:
-        for batch_id, batch_results, batch_updates in pool.imap_unordered(_scan_batch, batches):
-            completed += BATCH_SIZE
-            completed = min(completed, total)
-            print(f"进度: {completed}/{total} ({completed/total*100:.1f}%)")
-
-            for r in batch_results:
-                results.append(r)
-                print(f"  🎯 发现形态: {r.get('stock_code', '?')} ({r.get('stock_name', '')}) "
-                      f"- 涨幅: {r.get('uptrend_gain', 0):.2%}, "
-                      f"盘整: {r.get('consolidation_days', 0)}天, "
-                      f"评分: {r.get('pattern_score', 0):.2f}")
-            all_updates.extend(batch_updates)
-
-    state.batch_update_status(all_updates)
-
-    print("-" * 60)
-    n_matched = sum(1 for u in all_updates if u['status'] == 'matched')
-    n_watch_consol = sum(1 for u in all_updates if u['status'] == 'watching_consolidation')
-    n_watch_up = sum(1 for u in all_updates if u['status'] == 'watching_uptrend')
-    n_error = sum(1 for u in all_updates if u['status'] == 'error')
-    print(f"\n扫描完成! 发现 {len(results)} 只\"厂\"字形态股票.")
-    print(f"  新增观察-盘整中: {n_watch_consol} 只")
-    print(f"  新增观察-上涨中: {n_watch_up} 只")
-    print(f"  错误: {n_error} 只")
-
-    if results:
-        json_path = save_results(results, args.output)
-        _auto_report(json_path)
-
-    print()
-    state.print_summary()
+    finally:
+        provider.close()
 
 
 def cmd_backtest(args):
@@ -239,7 +244,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
-  python3 main.py scan                  # 增量扫描
+  python3 main.py scan                  # 增量扫描（使用默认数据源）
+  python3 main.py scan --source baostock # 使用 Baostock API
+  python3 main.py scan --source tdx     # 使用本地通达信数据
   python3 main.py scan --full            # 全量扫描
   python3 main.py scan --limit 100       # 调试前100只
 
@@ -259,6 +266,8 @@ def main():
     p_scan.add_argument('--limit', type=int, default=None, help='限制扫描数量')
     p_scan.add_argument('--workers', type=int, default=3, help='并行进程数')
     p_scan.add_argument('--output', default='results', help='输出目录')
+    p_scan.add_argument('--source', default='baostock', choices=['baostock', 'tdx'],
+                        help='数据源类型: baostock(默认) 或 tdx(本地)')
 
     p_bt = subparsers.add_parser('backtest', help='历史回测')
     p_bt.add_argument('--start', default=None, help='起始日期 (YYYY-MM-DD)')
