@@ -1,3 +1,14 @@
+<!-- ============================================================
+ 厂字形态 · 股票分析 (UI Prototype)
+ ============================================================
+ 核心功能（左侧导航切换）：
+   1. 个股分析 — 单只股票历史上所有「厂」字形态阶段 + K线图 + 均线
+   2. 大盘扫描 — 全市场扫描今日符合形态的股票
+ 数据缓存：日K数据首次请求后自动缓存到 data_cache/daily/*.csv
+           后续请求直接从本地读取，不重复请求 baostock
+ API 后端：Flask 服务 (api_server.py)，接口前缀为空(同源)
+ 图表引擎：TradingView LightweightCharts v4
+============================================================ -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -5,13 +16,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>厂字形态 · 股票分析</title>
 <style>
+/* ========== 全局变量 ========== */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --accent: #0071E3;
+  --accent: #0071E3;         /* Apple 蓝色主色调 */
   --accent-hover: #0077ED;
   --accent-active: #006EDB;
-  --bg: #F5F5F7;
+  --bg: #F5F5F7;             /* 背景浅灰 */
   --card: #FFFFFF;
   --card-border: rgba(0,0,0,0.06);
   --text-primary: #1D1D1F;
@@ -28,6 +40,7 @@
   --red: #FF3B30;
 }
 
+/* ========== 布局：侧边栏 + 主内容 ========== */
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
                'Helvetica Neue', 'PingFang SC', sans-serif;
@@ -99,7 +112,7 @@ body {
 .page-title { font-size: 24px; font-weight: 700; letter-spacing: -0.3px; }
 .page-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
 
-/* Cards */
+/* ========== 卡片组件 ========== */
 .card {
   background: var(--card);
   border-radius: var(--radius-lg);
@@ -130,7 +143,7 @@ body {
 
 .card-body { padding: 16px; }
 
-/* Form */
+/* ========== 表单控件 ========== */
 .form-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-end; }
 .form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 120px; }
 .form-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
@@ -155,7 +168,7 @@ body {
   padding-right: 36px;
 }
 
-/* Buttons */
+/* ========== 按钮 ========== */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -181,7 +194,7 @@ body {
 
 .btn-group { display: flex; gap: 8px; }
 
-/* Tags */
+/* ========== 标签 ========== */
 .tag { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 12px; }
 .tag-blue { background: rgba(0,113,227,0.1); color: var(--accent); }
 .tag-green { background: rgba(52,199,89,0.1); color: var(--green); }
@@ -189,7 +202,7 @@ body {
 .tag-red { background: rgba(255,59,48,0.1); color: var(--red); }
 .tag-gray { background: rgba(0,0,0,0.05); color: var(--text-secondary); }
 
-/* Table */
+/* ========== 表格 ========== */
 .table-wrap { overflow-x: auto; border-radius: var(--radius-md); border: 1px solid var(--card-border); }
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
 thead th {
@@ -210,13 +223,13 @@ tbody tr:hover { background: rgba(0,113,227,0.03); cursor: pointer; }
 tbody tr { transition: background 0.1s; }
 tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11px; }
 
-/* Score bar */
+/* ========== 评分条 ========== */
 .score-bar-wrap { display: inline-flex; align-items: center; gap: 8px; min-width: 100px; }
 .score-bar-track { flex: 1; height: 5px; background: #E8E8ED; border-radius: 3px; overflow: hidden; }
 .score-bar-fill { height: 100%; border-radius: 3px; }
 .score-text { font-size: 11px; font-weight: 700; min-width: 28px; text-align: right; }
 
-/* Progress */
+/* ========== 进度条（扫描用） ========== */
 .progress-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
 .progress-bar { height: 4px; background: #E8E8ED; border-radius: 2px; overflow: hidden; }
 .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s ease; }
@@ -226,7 +239,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
   100% { transform: translateX(400%); }
 }
 
-/* Log */
+/* ========== 日志面板（扫描用） ========== */
 .log-panel {
   background: rgba(0,0,0,0.02);
   border: 1px solid var(--divider);
@@ -246,13 +259,13 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
 .log-line.err { color: var(--red); }
 .log-line.bold { color: var(--text-primary); font-weight: 600; }
 
-/* Quick stats */
+/* ========== 快速统计卡片 ========== */
 .quick-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
 .stat { background: var(--card); border-radius: var(--radius-lg); border: 1px solid var(--card-border); padding: 14px 16px; text-align: center; }
 .stat .n { font-size: 24px; font-weight: 700; }
 .stat .l { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
 
-/* Chart container */
+/* ========== 图表容器（个股分析K线） ========== */
 .chart-container {
   position: relative;
   width: 100%;
@@ -293,9 +306,8 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
 .legend-item { display: flex; align-items: center; gap: 5px; }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 
-/* Timeline */
-  .timeline { }
-  .timeline-item {
+/* ========== 时间轴（历史阶段列表） ========== */
+    .timeline-item {
     padding: 12px 14px;
     border-radius: var(--radius-md);
     border: 1px solid var(--divider);
@@ -312,7 +324,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
   .timeline-item .phase-range { font-size: 10px; color: var(--text-tertiary); }
   .timeline-item .meta { font-size: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
 
-  /* Param row in stock analysis */
+  /* ========== 个股分析参数输入 ========== */
   .param-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-end; }
   .param-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 120px; }
   .param-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
@@ -329,7 +341,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
   }
   .param-input:focus { border-color: var(--accent); background: white; }
 
-  /* Chart tabs */
+  /* ========== 图表切换标签（扫描详情中的日K/分时） ========== */
   .chart-tabs { display: flex; gap: 2px; background: rgba(0,0,0,0.04); border-radius: var(--radius-sm); padding: 2px; width: fit-content; }
   .chart-tab { padding: 5px 14px; font-size: 12px; font-weight: 600; font-family: inherit; border: none; background: none; border-radius: 6px; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
   .chart-tab.active { background: var(--card); color: var(--text-primary); box-shadow: var(--shadow-sm); }
@@ -636,7 +648,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
 
 <script>
 // ============================================================
-// NAVIGATION
+// 页面导航（侧边栏切换个股分析 ↔ 大盘扫描）
 // ============================================================
 function navigateTo(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -650,7 +662,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 });
 
 // ============================================================
-// API
+// API 请求封装（同源请求，支持 AbortController 取消）
 // ============================================================
 const API = '';
 
@@ -676,7 +688,10 @@ async function loadStockList() {
 }
 
 // ============================================================
-// SCAN
+// 批量扫描全市场股票，查找符合「厂」字形态的标的
+//  - 每个股票创建独立 DataFetcher 实例，优先读取本地缓存
+//  - 使用 ThreadPool(6) 并行处理，baostock RLock 串行化查询
+//  - 支持 AbortController 取消扫描
 // ============================================================
 let _scanAbort = null;
 
@@ -781,7 +796,8 @@ function openScanDetail(code, name, pattern) {
 }
 
 // ============================================================
-// ANALYSIS BUTTONS
+// 分析按钮 / 下拉选股 → 加载主图
+//  - 输入框+下拉 都可触发重新分析
 // ============================================================
 document.getElementById('btnAnalyze').addEventListener('click', () => {
   const code = document.getElementById('stockCode').value.trim();
@@ -805,7 +821,7 @@ document.getElementById('stockSelect').addEventListener('change', (e) => {
 });
 
 // ============================================================
-// CHART TAB SWITCHING (scan detail chart)
+// 扫描结果详情中的 K线 / 分时 切换
 // ============================================================
 document.querySelectorAll('.chart-tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -817,7 +833,7 @@ document.querySelectorAll('.chart-tab').forEach(tab => {
 });
 
 // ============================================================
-// HELPERS
+// 均线计算工具（MA5 / MA10 / MA20 / MA60）
 // ============================================================
 function calcMA(data, period) {
   return data.map((d, i) => {
@@ -829,7 +845,10 @@ function calcMA(data, period) {
 }
 
 // ============================================================
-// MAIN CHART (stock analysis page)
+// 个股分析主页 K线图（含均线 + 形态阶段覆盖 + 统计摘要 + 时间轴）
+//  - 同时请求 /api/stock/daily 和 /api/stock/pattern
+//  - 渲染蜡烛图 + 4条均线 + 上涨/盘整覆盖线
+//  - 更新时间轴列表 + quick-stats 统计
 // ============================================================
 let mainChart = null;
 
@@ -950,7 +969,9 @@ function updateTimeline(phases) {
 }
 
 // ============================================================
-// SCAN DETAIL CHART
+// 扫描结果详情 K线 / 分时 图（点击扫描结果行触发）
+//  - mode='daily' 渲染蜡烛图 + 4条均线 + 阶段覆盖线
+//  - mode='intraday' 渲染分时线图
 // ============================================================
 let scanChart = null;
 
@@ -1023,6 +1044,11 @@ window.addEventListener('resize', () => {
   if (scanChart) scanChart.applyOptions({ width: document.getElementById('scanChart').clientWidth });
 });
 
+// ============================================================
+// 页面初始化
+//  - 加载股票下拉列表
+//  - 默认展示 "603135.SH 中研股份" 的 K线图
+// ============================================================
 window.addEventListener('load', () => {
   loadStockList();
   loadMainChart('603135');

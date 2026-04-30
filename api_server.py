@@ -196,14 +196,17 @@ def scan():
 
     fetcher = DataFetcher()
     all_stocks = fetcher.get_stock_list_with_names()
-    # 保持 fetcher 登录状态，各线程共享使用
+    total = len(all_stocks)
+
+    candidates = [(c, n) for c, n in all_stocks if not ('ST' in n or '*ST' in n)]
 
     def process_one(item):
         code, name = item
         if 'ST' in name or '*ST' in name:
             return {'code': code, 'name': name, 'status': 'no_pattern', 'score': 0, 'notes': 'ST'}, None
         try:
-            df = fetcher.get_daily_data(code, days=TRADING_CONFIG['data_days'])
+            f = DataFetcher()
+            df = f.get_daily_data(code, days=TRADING_CONFIG['data_days'])
             if len(df) < 60:
                 return {'code': code, 'name': name, 'status': 'no_pattern', 'score': 0, 'notes': '数据不足'}, None
 
@@ -237,11 +240,10 @@ def scan():
 
     matched = []
     updates = []
-    total = len(all_stocks)
 
     try:
-        with ThreadPool(processes=3) as pool:
-            for r, pat in pool.imap(process_one, all_stocks):
+        with ThreadPool(processes=6) as pool:
+            for r, pat in pool.imap(process_one, candidates):
                 updates.append(r)
                 if pat:
                     matched.append(pat)

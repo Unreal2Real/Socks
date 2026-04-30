@@ -2,8 +2,12 @@ import threading
 import baostock as bs
 import pandas as pd
 import numpy as np
+import os
 from datetime import datetime, timedelta
 from typing import Optional
+
+
+CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data_cache', 'daily')
 
 
 class DataFetcher:
@@ -12,6 +16,41 @@ class DataFetcher:
 
     def __init__(self):
         self.bs = bs
+        self._ensure_cache_dir()
+
+    @staticmethod
+    def _ensure_cache_dir():
+        os.makedirs(CACHE_DIR, exist_ok=True)
+
+    def _get_cache_path(self, stock_code: str) -> str:
+        return os.path.join(CACHE_DIR, f'{stock_code}.csv')
+
+    def _read_cache(self, stock_code: str, days: int) -> pd.DataFrame:
+        path = self._get_cache_path(stock_code)
+        if not os.path.exists(path):
+            return pd.DataFrame()
+        try:
+            df = pd.read_csv(path, parse_dates=['date'])
+            if not df.empty:
+                last_date = df['date'].max()
+                if hasattr(last_date, 'strftime'):
+                    last_date = last_date.strftime('%Y-%m-%d')
+                min_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
+                if last_date >= min_date:
+                    if len(df) <= days * 3:
+                        return df
+            return pd.DataFrame()
+        except Exception:
+            return pd.DataFrame()
+
+    def _write_cache(self, stock_code: str, df: pd.DataFrame):
+        if df.empty:
+            return
+        path = self._get_cache_path(stock_code)
+        try:
+            df.to_csv(path, index=False)
+        except Exception:
+            pass
 
     def _ensure_login(self):
         with DataFetcher._bs_lock:
@@ -81,8 +120,13 @@ class DataFetcher:
             return pd.DataFrame()
 
     def get_daily_data(self, stock_code: str, days: int = 250) -> pd.DataFrame:
-        self._ensure_login()
         stock_code = self._format_stock_code(stock_code)
+
+        cached = self._read_cache(stock_code, days)
+        if not cached.empty:
+            return cached
+
+        self._ensure_login()
         bs_code = self._to_bs_code(stock_code)
         end_date = datetime.now().strftime('%Y-%m-%d')
         start_date = (datetime.now() - timedelta(days=days * 2)).strftime('%Y-%m-%d')
@@ -117,9 +161,10 @@ class DataFetcher:
             df['date'] = pd.to_datetime(df['date'])
             df = df.sort_values('date').reset_index(drop=True)
 
+            self._write_cache(stock_code, df)
+
             if len(df) > days:
                 df = df.tail(days).reset_index(drop=True)
-
             return df
 
         except Exception:
