@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>厂字形态示意图</title>
+<style>
+:root{--bg:#0f1117;--card:#1a1d28;--border:#2a2d3a;--text:#d1d4dc;--dim:#787b86;--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--accent:#3b82f6;--purple:#c084fc}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);padding:20px}
+h1{font-size:18px;margin-bottom:4px}
+h2{font-size:14px;margin:16px 0 8px;color:#fff}
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:1100px){.chart-row{grid-template-columns:1fr}}
+.chart-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.chart-box h3{font-size:13px;margin-bottom:8px}
+.kline{width:100%;height:320px}
+.legend{font-size:11px;color:var(--dim);margin-top:4px;display:flex;gap:16px;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:4px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.meta{font-size:11px;color:var(--dim);margin-top:4px}
+.diagram{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
+.diagram h3{font-size:14px;margin-bottom:12px;color:#fff}
+.canvas-wrap{text-align:center}
+canvas{border-radius:8px}
+.step-info{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+.step{border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center}
+.step .num{font-size:20px;font-weight:700}
+.step .label{font-size:11px;color:var(--dim);margin:2px 0}
+.step .cond{font-size:11px;color:var(--orange)}
+</style>
+</head>
+<body>
+<h1>厂字形态 — 算法示意 vs 实际扫描</h1>
+
+<div class="diagram">
+  <h3>理想厂字形态（目标）</h3>
+  <div class="canvas-wrap">
+    <canvas id="idealCanvas" width="860" height="320"></canvas>
+  </div>
+  <div class="step-info">
+    <div class="step"><div class="num" style="color:var(--green)">1</div><div class="label">上涨段</div><div class="cond">MA5>MA10>MA20 多头排列</div><div class="cond">涨幅 ≥ 10%</div></div>
+    <div class="step"><div class="num" style="color:var(--accent)">2</div><div class="label">盘整段</div><div class="cond">不跌破峰顶太多(&lt;12%)</div><div class="cond">价格横在峰顶附近</div></div>
+    <div class="step"><div class="num" style="color:var(--purple)">3</div><div class="label">形态确认</div><div class="cond">振幅小 → 蓄势待发</div><div class="cond">如果仍在横盘 → 等待突破</div></div>
+  </div>
+  <p class="meta" style="margin-top:12px;text-align:center">
+    ⬆ 上涨 → ⬛ 横盘(不跌) = "厂"字
+  </p>
+</div>
+
+<div id="realCharts"></div>
+
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+// ==================== IDEAL PATTERN CANVAS ====================
+function drawIdeal() {
+  const c = document.getElementById('idealCanvas');
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  const margin = {top:30, right:40, bottom:40, left:50};
+  const pw = W - margin.left - margin.right;
+  const ph = H - margin.top - margin.bottom;
+
+  ctx.fillStyle = '#1a1d28';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = '#2a2d3a';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 10; i++) {
+    let y = margin.top + ph * i / 10;
+    ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(W - margin.right, y); ctx.stroke();
+  }
+  for (let i = 0; i <= 20; i++) {
+    let x = margin.left + pw * i / 20;
+    ctx.beginPath(); ctx.moveTo(x, margin.top); ctx.lineTo(x, H - margin.bottom); ctx.stroke();
+  }
+
+  // Price data - 60 days, simulate ideal pattern
+  const days = 60;
+  const prices = [];
+  let px = margin.left;
+  
+  // Phase 1: Flat/pre-uptrend (first 10 days)
+  for (let i = 0; i < 10; i++) prices.push(10 + Math.random()*0.3);
+  
+  // Phase 2: UPTREND (days 10-25)
+  for (let i = 0; i < 15; i++) prices.push(10 + 1.5 + (i/15)*2.5 + Math.random()*0.2);
+  const peak = prices[prices.length-1];
+  
+  // Phase 3: CONSOLIDATION - flat near peak (days 25-55)
+  for (let i = 0; i < 30; i++) {
+    prices.push(peak + (Math.random()-0.5)*0.8); // tiny oscillation
+  }
+  
+  // Phase 4: Slight continuation (days 55-60)
+  for (let i = 0; i < 5; i++) prices.push(peak + 0.3 + (Math.random()-0.3)*0.5);
+
+  const maxP = Math.max(...prices) * 1.05;
+  const minP = Math.min(...prices) * 0.95;
+  const scale = ph / (maxP - minP);
+  const yPos = v => margin.top + ph - (v - minP) * scale;
+
+  // Draw zones
+  // Uptrend zone (days 10-25)
+  ctx.fillStyle = 'rgba(34,197,94,0.08)';
+  let x1 = margin.left + pw * 10/days;
+  let x2 = margin.left + pw * 25/days;
+  ctx.fillRect(x1, margin.top, x2 - x1, ph);
+  ctx.strokeStyle = '#22c55e33';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x1, margin.top, x2 - x1, ph);
+  ctx.fillStyle = '#22c55e';
+  ctx.font = 'bold 11px system-ui';
+  ctx.fillText('上涨段', x1 + 4, margin.top + 14);
+
+  // Consolidation zone (days 25-55)
+  ctx.fillStyle = 'rgba(59,130,246,0.08)';
+  x1 = margin.left + pw * 25/days;
+  x2 = margin.left + pw * 55/days;
+  ctx.fillRect(x1, margin.top, x2 - x1, ph);
+  ctx.strokeStyle = '#3b82f633';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x1, margin.top, x2 - x1, ph);
+  ctx.fillStyle = '#3b82f6';
+  ctx.fillText('盘整段 (横盘不跌)', x1 + 4, margin.top + 14);
+
+  // Price line
+  ctx.beginPath();
+  ctx.strokeStyle = '#d1d4dc';
+  ctx.lineWidth = 2;
+  prices.forEach((p, i) => {
+    let x = margin.left + pw * i / days;
+    let y = yPos(p);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Peak marker
+  let peakIdx = 24;
+  let peakX = margin.left + pw * peakIdx / days;
+  let peakY = yPos(prices[peakIdx]);
+  ctx.fillStyle = '#f59e0b';
+  ctx.beginPath(); ctx.arc(peakX, peakY, 5, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#f59e0b';
+  ctx.font = 'bold 10px system-ui';
+  ctx.fillText('峰顶', peakX + 8, peakY - 4);
+
+  // Uptrend arrow
+  let utX = margin.left + pw * 10/days;
+  let utY = yPos(prices[10]);
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(utX, utY+15); ctx.lineTo(peakX, peakY-15); ctx.stroke();
+  ctx.fillStyle = '#22c55e'; ctx.font = '10px system-ui';
+  ctx.fillText('+' + ((peak/prices[10]-1)*100).toFixed(0) + '%', (utX+peakX)/2 - 10, (utY+peakY)/2);
+
+  // Consolidation range line
+  let cMedian = yPos(peak * 0.99);
+  ctx.setLineDash([4,4]);
+  ctx.strokeStyle = '#3b82f666';
+  ctx.lineWidth = 1;
+  x1 = margin.left + pw * 25/days;
+  x2 = margin.left + pw * 55/days;
+  ctx.beginPath(); ctx.moveTo(x1, cMedian); ctx.lineTo(x2, cMedian); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#3b82f6'; ctx.font = '9px system-ui';
+  ctx.fillText('横盘', x2 + 4, cMedian + 4);
+
+  // Axis labels
+  ctx.fillStyle = '#787b86';
+  ctx.font = '10px system-ui';
+  ctx.fillText('时间', W/2, H - 4);
+  ctx.fillText('价格', 4, H/2);
+  
+  // Draw top labels
+  y1 = margin.top + ph * 0.02;
+  ctx.fillStyle = '#d1d4dc';
+  ctx.font = '11px system-ui';
+}
+drawIdeal();
+
+// ==================== REAL CHARTS ====================
+const STOCKS = [
+  {code:'601088', name:'中国神华'},
+  {code:'600971', name:'恒源煤电'},
+  {code:'601225', name:'陕西煤业'},
+  {code:'000582', name:'北部湾港'},
+];
+
+function createRealChart(code, name, containerId) {
+  const el = document.getElementById(containerId);
+  const chart = LightweightCharts.createChart(el, {
+    height: 320,
+    layout: { background: { color: '#1a1d28' }, textColor: '#d1d4dc' },
+    grid: { vertLines: { color: '#2a2d3a' }, horzLines: { color: '#2a2d3a' } },
+    crosshair: { mode: 1 },
+    rightPriceScale: { borderColor: '#2a2d3a', scaleMargins: { top: 0.05, bottom: 0.2 } },
+    timeScale: { borderColor: '#2a2d3a', timeVisible: true },
+  });
+
+  const candles = chart.addCandlestickSeries({
+    upColor: '#22c55e', downColor: '#ef4444',
+    borderUpColor: '#22c55e', borderDownColor: '#ef4444',
+    wickUpColor: '#22c55e', wickDownColor: '#ef4444',
+  });
+
+  const volSeries = chart.addHistogramSeries({
+    priceFormat: { type: 'volume' }, priceScaleId: 'volume',
+  });
+  chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.75, bottom: 0 }, visible: true });
+
+  const maLine = (key, color, style) => chart.addLineSeries({ color, lineWidth: 1, lineStyle: style });
+
+  return { chart, candles, volSeries, ma5: maLine('ma5','#fbbf24',0), ma10: maLine('ma10','#60a5fa',1), ma20: maLine('ma20','#c084fc',2) };
+}
+
+async function loadCharts() {
+  const container = document.getElementById('realCharts');
+  let html = '<h2>实际扫描的厂字形态</h2><div class="chart-row">';
+
+  for (let s of STOCKS) {
+    const id = `chart-${s.code}`;
+    html += `<div class="chart-box"><h3>${s.code} ${s.name}</h3>
+      <div class="kline" id="${id}"></div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--green)"></span>上涨段</span>
+        <span><span class="dot" style="background:var(--accent)"></span>盘整段</span>
+      </div>
+      <div class="meta" id="meta-${s.code}">加载中…</div></div>`;
+  }
+  html += '</div>';
+  container.innerHTML = html;
+
+  for (let s of STOCKS) {
+    try {
+      const r = await fetch(`/api/stock/${s.code}?days=500`);
+      const j = await r.json();
+      if (j.code !== 0) continue;
+      
+      const ch = createRealChart(s.code, s.name, `chart-${s.code}`);
+      const candles = [], volumes = [];
+      j.data.forEach(d => {
+        const t = d.time.includes('-') ? d.time : d.time.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3');
+        candles.push({time:t, open:d.open, high:d.high, low:d.low, close:d.close});
+        volumes.push({time:t, value:d.volume, color: d.close>=d.open?'rgba(34,197,94,.25)':'rgba(239,68,68,.25)'});
+      });
+      ch.candles.setData(candles);
+      ch.vol.setData(volumes);
+
+      // Draw MAs
+      for (let p of [5,10,20]) {
+        const ma = [];
+        for (let i = p-1; i < j.data.length; i++) {
+          let sum = 0;
+          for (let k = i-p+1; k <= i; k++) sum += j.data[k].close;
+          const t = j.data[i].time.includes('-') ? j.data[i].time : j.data[i].time.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3');
+          ma.push({time:t, value: sum/p});
+        }
+        ch[`ma${p}`].setData(ma);
+      }
+
+      // Draw pattern markers if available
+      const p = j.pattern;
+      if (p) {
+        const markers = [];
+        const toT = s => s.includes('-') ? s : s.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3');
+        markers.push({ time: toT(p.uptrend_start_date), position: 'belowBar', color: '#22c55e', shape: 'arrowUp', text: 'UP⤴', size: 3 });
+        markers.push({ time: toT(p.uptrend_end_date), position: 'aboveBar', color: '#f59e0b', shape: 'circle', text: 'PEAK', size: 3 });
+        markers.push({ time: toT(p.consolidation_end_date), position: 'belowBar', color: '#3b82f6', shape: 'arrowUp', text: '⭳', size: 3 });
+        ch.candles.setMarkers(markers);
+
+        // Add background rectangles for pattern zones
+        // (lightweight-charts doesn't support this directly, use markers instead)
+        const isOngoing = p.consolidation_end_date >= '2026-04-28';
+        document.getElementById(`meta-${s.code}`).innerHTML = 
+          `评分: ${p.pattern_score.toFixed(2)} | 涨幅: +${(p.uptrend_gain*100).toFixed(1)}% | 
+           上涨: ${p.uptrend_start_date}→${p.uptrend_end_date} | 
+           盘整: ${p.consolidation_start_date}→${p.consolidation_end_date} | 
+           <span style="color:${isOngoing?'var(--green)':'var(--dim)'}">${isOngoing ? '🔄 横盘中' : '✓ 已完成'}</span>`;
+      } else {
+        document.getElementById(`meta-${s.code}`).textContent = '未匹配形态';
+      }
+      ch.chart.timeScale().fitContent();
+    } catch(e) {
+      document.getElementById(`meta-${s.code}`).textContent = '加载失败: ' + e.message;
+    }
+  }
+}
+
+loadCharts();
+</script>
+</body>
+</html>

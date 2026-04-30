@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>厂字形态示意图</title>
+<style>
+:root{--bg:#0f1117;--card:#1a1d28;--border:#2a2d3a;--text:#d1d4dc;--dim:#787b86;--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--accent:#3b82f6;--purple:#c084fc}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);padding:20px}
+h2{font-size:16px;margin-bottom:8px;color:#fff}
+.row{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center}
+.item img{border-radius:6px;max-width:100%}
+.item .info{font-size:12px;color:var(--dim);margin-top:6px}
+.legend{display:flex;gap:16px;justify-content:center;margin:16px 0;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:6px;font-size:12px}
+.dot{width:12px;height:12px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body>
+
+<h2 style="text-align:center">厂字形态 — 算法分析图</h2>
+<p style="text-align:center;color:var(--dim);font-size:13px;margin-bottom:12px">
+  绿色区 = 上涨段 | 蓝色区 = 盘整段 | 橙色菱形 = 峰顶 | 红色双箭头 = 回撤幅度
+</p>
+<div class="legend">
+  <span><span class="dot" style="background:var(--green)"></span>上涨段</span>
+  <span><span class="dot" style="background:var(--accent)"></span>盘整段</span>
+  <span><span class="dot" style="background:var(--orange)"></span>峰顶</span>
+  <span><span class="dot" style="background:var(--red)"></span>回撤</span>
+  <span><span class="dot" style="background:var(--purple)"></span>盘整结束</span>
+</div>
+<div class="row">
+  <div class="item">
+    <img src="pattern_diagram.png" alt="形态分析图">
+  </div>
+</div>
+
+<p style="text-align:center;color:var(--dim);font-size:11px;margin-top:12px">
+  图说明：股价先涨起来(绿色区) → 然后在高位横向震荡不回跌(蓝色区) = "厂"字形态
+  <br>如果蓝色区一直延续到最右端 = 当前正在横盘中 (值得关注)
+</p>
+
+</body>
+</html>
