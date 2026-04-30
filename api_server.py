@@ -181,6 +181,41 @@ def scan():
         provider.close()
 
 
+@app.route('/api/stock/pattern')
+def stock_pattern():
+    code = request.args.get('code', '').strip()
+    if not code:
+        return jsonify({'code': 1, 'msg': '缺少code参数'})
+
+    provider = create_provider_with_fallback()
+    try:
+        df = provider.get_daily_data(code, days=500)
+        if df.empty:
+            return jsonify({'code': 1, 'msg': '无数据'})
+
+        config = make_config({})
+        recognizer = FactoryPatternRecognizer(config)
+        pattern = recognizer.find_pattern(df)
+
+        if pattern:
+            return jsonify({
+                'code': 0,
+                'data': [{
+                    'pattern_type': pattern.get('type', 'factory'),
+                    'pattern_score': pattern.get('score', 0),
+                    'uptrend_start_date': pattern.get('uptrend_start_date', ''),
+                    'uptrend_end_date': pattern.get('uptrend_end_date', ''),
+                    'consolidation_end_date': pattern.get('consolidation_end_date', ''),
+                    'breakout_date': pattern.get('breakout_date', ''),
+                    'notes': pattern.get('notes', '')
+                }]
+            })
+        else:
+            return jsonify({'code': 0, 'data': []})
+    finally:
+        provider.close()
+
+
 @app.route('/api/backtest', methods=['GET', 'POST'])
 def backtest():
     if request.method == 'POST':
