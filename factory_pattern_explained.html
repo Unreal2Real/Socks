@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>「厂」字形态 — 判断逻辑解析</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #f5f5f7;
+  --card: #ffffff;
+  --text: #1d1d1f;
+  --text2: #6e6e73;
+  --blue: #0071e3;
+  --green: #30d158;
+  --red: #ff453a;
+  --orange: #ff9f0a;
+  --border: rgba(0,0,0,0.08);
+  --shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+  padding: 0 20px 80px;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.header {
+  padding: 40px 0 24px;
+  text-align: center;
+}
+
+.header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  margin-bottom: 8px;
+}
+
+.header p {
+  font-size: 14px;
+  color: var(--text2);
+}
+
+/* ========== IDEAL PATTERN ========== */
+.ideal-section {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 28px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+}
+
+.ideal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.ideal-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.ideal-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.chart-wrap {
+  position: relative;
+  background: #fafafa;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+canvas#idealChart { display: block; width: 100%; }
+
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+.conditions-table {
+  background: #fafafa;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.condition-row {
+  display: flex;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  gap: 10px;
+}
+.condition-row:last-child { border-bottom: none; }
+
+.c-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.c-up { background: #ffebee; color: #c62828; }
+.c-consol { background: #e3f2fd; color: #1565c0; }
+.c-band { background: #f3e5f5; color: #6a1b9a; }
+.c-vol { background: #fff8e1; color: #e65100; }
+.c-vr { background: #e8f5e9; color: #2e7d32; }
+
+.c-name { flex: 1; color: var(--text); }
+.c-value { font-weight: 600; font-size: 12px; color: var(--blue); min-width: 60px; text-align: right; }
+.c-desc { font-size: 11px; color: var(--text2); min-width: 80px; text-align: right; }
+
+.condition-row.pass { background: #fafff8; }
+.condition-row.pass .c-value { color: #2e7d32; }
+.condition-row.fail { background: #fff8f8; }
+.condition-row.fail .c-value { color: #c62828; }
+
+/* ========== SCORE RULES ========== */
+.score-section {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 24px 28px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+}
+
+.score-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.score-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.score-item {
+  background: #fafafa;
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+}
+
+.score-item .s-label {
+  font-size: 11px;
+  color: var(--text2);
+  margin-bottom: 4px;
+}
+
+.score-item .s-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.score-item .s-max {
+  font-size: 10px;
+  color: var(--text2);
+}
+
+.score-item:nth-child(1) .s-value { color: #c62828; }
+.score-item:nth-child(2) .s-value { color: #1565c0; }
+.score-item:nth-child(3) .s-value { color: #6a1b9a; }
+.score-item:nth-child(4) .s-value { color: #2e7d32; }
+
+/* ========== CASES GRID ========== */
+.cases-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  padding: 0 4px;
+}
+
+.cases-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.case-card {
+  background: var(--card);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.case-card.pass { border-top: 3px solid var(--green); }
+.case-card.fail { border-top: 3px solid var(--red); }
+
+.case-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+}
+
+.case-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.case-verdict {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+.pass .case-verdict { background: #e8f5e9; color: #2e7d32; }
+.fail .case-verdict { background: #ffebee; color: #c62828; }
+
+.case-chart {
+  margin: 0 18px;
+  background: #fafafa;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+canvas.caseCanvas { display: block; width: 100%; }
+
+.case-indicators {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 12px 18px;
+}
+
+.ind-item {
+  text-align: center;
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 8px 4px;
+}
+
+.ind-item .i-label {
+  font-size: 10px;
+  color: var(--text2);
+  margin-bottom: 2px;
+}
+
+.ind-item .i-value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ind-item.ok .i-value { color: #2e7d32; }
+.ind-item.bad .i-value { color: #c62828; }
+
+.case-reason {
+  padding: 0 18px 16px;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+
+.threshold-bar {
+  padding: 0 18px 16px;
+}
+
+.threshold-bar .tb-label {
+  font-size: 11px;
+  color: var(--text2);
+  margin-bottom: 5px;
+}
+
+.tb-track {
+  height: 6px;
+  background: #eee;
+  border-radius: 3px;
+  position: relative;
+  overflow: visible;
+}
+
+.tb-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+.tb-threshold {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 14px;
+  background: #555;
+  border-radius: 1px;
+  transform: translateX(-50%);
+}
+
+.tb-threshold::after {
+  content: attr(data-label);
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: var(--text2);
+  white-space: nowrap;
+}
+
+/* ========== BOTTOM INSIGHT ========== */
+.insight-section {
+  background: linear-gradient(135deg, #1d1d1f, #2d2d30);
+  color: #fff;
+  border-radius: 18px;
+  padding: 28px;
+  margin-top: 20px;
+  box-shadow: var(--shadow);
+}
+
+.insight-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.insight-title::before {
+  content: '💡';
+}
+
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.insight-item h4 {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.insight-item p {
+  font-size: 13px;
+  color: rgba(255,255,255,0.85);
+  line-height: 1.7;
+}
+
+.insight-item strong {
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .ideal-layout { grid-template-columns: 1fr; }
+  .score-grid { grid-template-columns: repeat(2, 1fr); }
+  .cases-grid { grid-template-columns: 1fr; }
+  .insight-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1>「厂」字形态 — 判断逻辑解析</h1>
+    <p>基于 factory_pattern.py 源码，分析完美形态与常见偏差情形</p>
+  </div>
+
+  <!-- SECTION 1: IDEAL PATTERN -->
+  <div class="ideal-section">
+    <div class="ideal-header">
+      <div class="ideal-title">完美「厂」字形态示意</div>
+      <span class="badge">CASE A · 全部通过</span>
+    </div>
+    <div class="ideal-layout">
+      <div>
+        <div class="chart-wrap">
+          <canvas id="idealChart" height="220"></canvas>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#ff453a"></div>上涨段（持续10天，均线多头）</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#0071e3"></div>盘整段（布林带收窄，量能萎缩）</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#30d158"></div>一横（横盘整理）</div>
+        </div>
+      </div>
+      <div class="conditions-table" id="conditionsTable"></div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: SCORING -->
+  <div class="score-section">
+    <div class="score-title">综合评分规则（满分 1.0）</div>
+    <div class="score-grid">
+      <div class="score-item">
+        <div class="s-label">上涨幅度</div>
+        <div class="s-value">+0.3</div>
+        <div class="s-max">≥20% 得满分，≥15% 得 0.2</div>
+      </div>
+      <div class="score-item">
+        <div class="s-label">波动率</div>
+        <div class="s-value">+0.3</div>
+        <div class="s-max">≤10% 得满分，≤15% 得 0.2</div>
+      </div>
+      <div class="score-item">
+        <div class="s-label">布林带宽</div>
+        <div class="s-value">+0.2</div>
+        <div class="s-max">≤10% 得满分，≤15% 得 0.1</div>
+      </div>
+      <div class="score-item">
+        <div class="s-label">量比</div>
+        <div class="s-value">+0.2</div>
+        <div class="s-max">≤0.4 得满分，≤0.5 得 0.1</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: CASES -->
+  <div class="cases-title">四种典型情形对比</div>
+  <div class="cases-grid" id="casesGrid"></div>
+
+  <!-- SECTION 4: INSIGHT -->
+  <div class="insight-section">
+    <div class="insight-title">核心洞察</div>
+    <div class="insight-grid">
+      <div class="insight-item">
+        <h4>最难满足的条件</h4>
+        <p><strong>成交量萎缩</strong>是最容易被忽视的条件。实际盘整中量能往往维持较高水平，<strong>volume_ratio ≤ 0.60</strong> 在真实市场中相当苛刻。</p>
+      </div>
+      <div class="insight-item">
+        <h4>一横的重要性</h4>
+        <p>「厂」字下面的<strong>一横</strong>代表布林带持续收窄（≤0.15），这说明主力控盘程度高，而非无序震荡。波动率 ≤15% 是硬门槛。</p>
+      </div>
+      <div class="insight-item">
+        <h4>上涨段是门槛</h4>
+        <p>上涨段必须满足 <strong>MA5 &gt; MA10 &gt; MA20</strong> 持续确认，且涨幅 ≥15%。这是形态成立的前置条件，决定了是否有足够的市场共识。</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CASES = [
+  {
+    name: 'A', label: '完美形态',
+    verdict: '✅ 通过',
+    pass: true,
+    desc: '各项指标均在理想范围内，全部条件满足，pattern_score ≈ 1.0',
+    gain: 0.197, bw: 0.104, vol: 0.042, vr: 0.714,
+    consolDays: 20,
+    indicators: [
+      { label: '上涨涨幅', value: '+19.7%', ok: true, threshold: '≥15%', color: '#c62828' },
+      { label: '盘整天数', value: '20天', ok: true, threshold: '10~40天', color: '#1565c0' },
+      { label: '布林带宽', value: '0.104', ok: true, threshold: '≤0.15', color: '#6a1b9a' },
+      { label: '波动率', value: '0.042', ok: true, threshold: '≤0.15', color: '#2e7d32' },
+    ],
+    chartData: [
+      // [day, close, isUptrend, isConsolidation]
+      [0,20.00,0,0],[1,20.36,1,0],[2,20.72,1,0],[3,21.10,1,0],[4,21.48,1,0],
+      [5,21.87,1,0],[6,22.26,1,0],[7,22.66,1,0],[8,23.07,1,0],[9,23.49,1,0],
+      [10,23.92,1,0],[11,24.02,0,1],[12,24.10,0,1],[13,24.05,0,1],[14,24.12,0,1],
+      [15,24.08,0,1],[16,24.15,0,1],[17,24.20,0,1],[18,24.18,0,1],[19,24.22,0,1],
+      [20,24.10,0,1],[21,24.05,0,1],[22,24.15,0,1],[23,24.08,0,1],[24,24.12,0,1],
+      [25,24.20,0,1],[26,24.15,0,1],[27,24.10,0,1],[28,24.18,0,1],[29,24.22,0,1],
+      [30,24.35,0,1],
+    ]
+  },
+  {
+    name: 'B', label: '上涨不足',
+    verdict: '❌ 淘汰',
+    pass: false,
+    desc: '涨幅仅 14.1%，未达到 15% 阈值，在 _scan_uptrend 阶段即被淘汰',
+    gain: 0.141, bw: 0.083, vol: 0.045, vr: 0.714,
+    consolDays: 20,
+    indicators: [
+      { label: '上涨涨幅', value: '+14.1%', ok: false, threshold: '≥15%', color: '#c62828' },
+      { label: '盘整天数', value: '20天', ok: true, threshold: '10~40天', color: '#1565c0' },
+      { label: '布林带宽', value: '0.083', ok: true, threshold: '≤0.15', color: '#6a1b9a' },
+      { label: '波动率', value: '0.045', ok: true, threshold: '≤0.15', color: '#2e7d32' },
+    ],
+    chartData: [
+      [0,20.00,0,0],[1,20.30,1,0],[2,20.61,1,0],[3,20.92,1,0],[4,21.24,1,0],
+      [5,21.56,1,0],[6,21.88,1,0],[7,22.21,1,0],[8,22.54,1,0],[9,22.88,1,0],
+      [10,23.22,1,0],[11,23.30,0,1],[12,23.40,0,1],[13,23.35,0,1],[14,23.42,0,1],
+      [15,23.38,0,1],[16,23.45,0,1],[17,23.50,0,1],[18,23.48,0,1],[19,23.52,0,1],
+      [20,23.40,0,1],[21,23.35,0,1],[22,23.45,0,1],[23,23.38,0,1],[24,23.42,0,1],
+      [25,23.50,0,1],[26,23.45,0,1],[27,23.40,0,1],[28,23.48,0,1],[29,23.52,0,1],
+      [30,23.65,0,1],
+    ]
+  },
+  {
+    name: 'C', label: '成交量萎缩不足',
+    verdict: '❌ 淘汰',
+    pass: false,
+    desc: 'volume_ratio = 0.89 > 0.60 阈值，在 _is_valid_consolidation 中被拒绝',
+    gain: 0.214, bw: 0.118, vol: 0.045, vr: 0.893,
+    consolDays: 20,
+    indicators: [
+      { label: '上涨涨幅', value: '+21.4%', ok: true, threshold: '≥15%', color: '#c62828' },
+      { label: '盘整天数', value: '20天', ok: true, threshold: '10~40天', color: '#1565c0' },
+      { label: '布林带宽', value: '0.118', ok: true, threshold: '≤0.15', color: '#6a1b9a' },
+      { label: '成交量比', value: '0.893', ok: false, threshold: '≤0.60', color: '#e65100' },
+    ],
+    chartData: [
+      [0,20.00,0,0],[1,20.40,1,0],[2,20.82,1,0],[3,21.24,1,0],[4,21.67,1,0],
+      [5,22.10,1,0],[6,22.54,1,0],[7,23.00,1,0],[8,23.46,1,0],[9,23.93,1,0],
+      [10,24.42,1,0],[11,24.50,0,1],[12,24.60,0,1],[13,24.55,0,1],[14,24.62,0,1],
+      [15,24.58,0,1],[16,24.65,0,1],[17,24.70,0,1],[18,24.68,0,1],[19,24.72,0,1],
+      [20,24.60,0,1],[21,24.55,0,1],[22,24.65,0,1],[23,24.58,0,1],[24,24.62,0,1],
+      [25,24.70,0,1],[26,24.65,0,1],[27,24.60,0,1],[28,24.68,0,1],[29,24.72,0,1],
+      [30,24.85,0,1],
+    ]
+  },
+  {
+    name: 'D', label: '盘整天数过长',
+    verdict: '❌ 淘汰',
+    pass: false,
+    desc: '盘整 55 天 > 40 天上限，_scan_consolidation 遍历完整个窗口仍未找到有效位置',
+    gain: 0.221, bw: 0.048, vol: 0.061, vr: 0.927,
+    consolDays: 55,
+    indicators: [
+      { label: '上涨涨幅', value: '+22.1%', ok: true, threshold: '≥15%', color: '#c62828' },
+      { label: '盘整天数', value: '55天', ok: false, threshold: '≤40天', color: '#1565c0' },
+      { label: '布林带宽', value: '0.048', ok: true, threshold: '≤0.15', color: '#6a1b9a' },
+      { label: '成交量比', value: '0.927', ok: false, threshold: '≤0.60', color: '#e65100' },
+    ],
+    chartData: (() => {
+      const d = [];
+      let p = 20.00;
+      for(let i=0;i<=55;i++){
+        if(i<=10){ p*=1.018; }
+        else if(i<=55){ p*=1.000; }
+        d.push([i, parseFloat(p.toFixed(2)), i<=10?1:0, i>10?1:0]);
+      }
+      return d;
+    })()
+  }
+];
+
+const CONDITIONS = [
+  { icon: '↑', iconClass: 'c-up', name: '上涨段 MA多头', value: 'MA5>MA10>MA20', desc: '持续5天以上', pass: true },
+  { icon: '↑', iconClass: 'c-up', name: '上涨幅度', value: '≥15%（越接近20%越好）', desc: '通过阈值后break', pass: true },
+  { icon: '📊', iconClass: 'c-consol', name: '盘整天数', value: '10~40天', desc: 'find_pattern窗口内', pass: true },
+  { icon: '📊', iconClass: 'c-consol', name: '布林带宽（BBW）', value: '均值 < 0.15', desc: '盘整期间平均', pass: true },
+  { icon: '⚡', iconClass: 'c-band', name: '波动率', value: '< 0.15', desc: '(最高-最低)/起始价', pass: true },
+  { icon: '📉', iconClass: 'c-vol', name: '成交量比均值', value: '< 0.60', desc: '日均量/20日均量', pass: true },
+];
+
+// ============ DRAW IDEAL CHART ============
+function drawIdealChart() {
+  const canvas = document.getElementById('idealChart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth;
+  const H = 220;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+
+  // Generate data
+  const data = [];
+  let price = 20.0;
+  for (let i = 0; i <= 30; i++) {
+    if (i <= 10) { price *= 1.018; }
+    else { price *= (1 + (Math.random() - 0.5) * 0.008); }
+    data.push(parseFloat(price.toFixed(3)));
+  }
+
+  const minP = Math.min(...data) * 0.98;
+  const maxP = Math.max(...data) * 1.02;
+  const priceRange = maxP - minP;
+
+  const padL = 10, padR = 10, padT = 10, padB = 10;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  function px(day) { return padL + (day / 30) * chartW; }
+  function py(price) { return padT + (1 - (price - minP) / priceRange) * chartH; }
+
+  // Background
+  ctx.fillStyle = '#fafafa';
+  ctx.fillRect(0, 0, W, H);
+
+  // Uptrend zone
+  ctx.fillStyle = 'rgba(255,69,58,0.06)';
+  ctx.fillRect(px(0), 0, px(10) - px(0), H);
+
+  // Consolidation zone
+  ctx.fillStyle = 'rgba(0,113,227,0.06)';
+  ctx.fillRect(px(10), 0, px(30) - px(10), H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (i / 4) * chartH;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + chartW, y);
+    ctx.stroke();
+  }
+
+  // Uptrend area fill
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(data[0]));
+  for (let i = 1; i <= 10; i++) ctx.lineTo(px(i), py(data[i]));
+  ctx.lineTo(px(10), py(data[0]));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,69,58,0.12)';
+  ctx.fill();
+
+  // Consolidation area fill
+  ctx.beginPath();
+  ctx.moveTo(px(10), py(data[10]));
+  for (let i = 11; i <= 30; i++) ctx.lineTo(px(i), py(data[i]));
+  ctx.lineTo(px(30), py(data[10]));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,113,227,0.12)';
+  ctx.fill();
+
+  // Price line
+  ctx.beginPath();
+  ctx.strokeStyle = '#ff453a';
+  ctx.lineWidth = 2;
+  ctx.moveTo(px(0), py(data[0]));
+  for (let i = 1; i <= 30; i++) ctx.lineTo(px(i), py(data[i]));
+  ctx.stroke();
+
+  // Dashed divider
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = 'rgba(0,113,227,0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(px(10), padT);
+  ctx.lineTo(px(10), padT + chartH);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Labels
+  ctx.fillStyle = '#ff453a';
+  ctx.font = '500 11px -apple-system';
+  ctx.fillText('↑ 上涨段（10天）', px(2), py(data[10]) - 8);
+
+  ctx.fillStyle = '#0071e3';
+  ctx.fillText('一横 盘整段（20天）', px(12), py(data[20]) + 14);
+
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.font = '10px -apple-system';
+  ctx.fillText(`起 ${data[0].toFixed(2)}`, px(0), py(data[0]) + 12);
+  ctx.fillText(`顶 ${data[10].toFixed(2)}`, px(10) - 4, py(data[10]) - 6);
+
+  // Price axis
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.font = '10px -apple-system';
+  ctx.textAlign = 'right';
+  const priceLabels = [minP, (minP+maxP)/2, maxP];
+  priceLabels.forEach(p => {
+    ctx.fillText(p.toFixed(1), W - 4, py(p) + 3);
+  });
+  ctx.textAlign = 'left';
+}
+
+// ============ DRAW MINI CASE CHART ============
+function drawCaseChart(canvas, chartData) {
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth;
+  const H = 100;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+
+  const prices = chartData.map(d => d[1]);
+  const minP = Math.min(...prices) * 0.99;
+  const maxP = Math.max(...prices) * 1.01;
+  const padL = 8, padR = 8, padT = 8, padB = 8;
+
+  function px(day) { return padL + (day / (chartData.length - 1)) * (W - padL - padR); }
+  function py(price) { return padT + (1 - (price - minP) / (maxP - minP)) * (H - padT - padB); }
+
+  // Background
+  ctx.fillStyle = '#fafafa';
+  ctx.fillRect(0, 0, W, H);
+
+  // Find transition index
+  const transitionIdx = chartData.findIndex(d => d[2] === 0 && d[3] === 1);
+
+  // Uptrend zone
+  if (transitionIdx > 0) {
+    ctx.fillStyle = 'rgba(255,69,58,0.08)';
+    ctx.fillRect(0, 0, px(transitionIdx), H);
+  }
+
+  // Consolidation zone
+  ctx.fillStyle = 'rgba(0,113,227,0.05)';
+  ctx.fillRect(px(transitionIdx), 0, W - px(transitionIdx), H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) {
+    const y = padT + (i / 3) * (H - padT - padB);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(W - padR, y);
+    ctx.stroke();
+  }
+
+  // Dashed divider
+  ctx.setLineDash([3, 3]);
+  ctx.strokeStyle = 'rgba(0,113,227,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(px(transitionIdx), padT);
+  ctx.lineTo(px(transitionIdx), H - padB);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Price line
+  ctx.beginPath();
+  ctx.strokeStyle = '#ff453a';
+  ctx.lineWidth = 1.5;
+  ctx.moveTo(px(0), py(prices[0]));
+  for (let i = 1; i < chartData.length; i++) ctx.lineTo(px(i), py(prices[i]));
+  ctx.stroke();
+
+  // Color last point based on pass/fail
+  const last = chartData[chartData.length - 1];
+  ctx.beginPath();
+  ctx.arc(px(chartData.length - 1), py(last[1]), 3, 0, Math.PI * 2);
+  ctx.fillStyle = chartData[chartData.length - 1][3] === 1 ? '#0071e3' : '#ff453a';
+  ctx.fill();
+}
+
+// ============ RENDER ============
+function renderConditions() {
+  const container = document.getElementById('conditionsTable');
+  container.innerHTML = CONDITIONS.map(c => `
+    <div class="condition-row ${c.pass ? 'pass' : 'fail'}">
+      <div class="c-icon ${c.iconClass}">${c.icon}</div>
+      <div class="c-name">${c.name}</div>
+      <div class="c-value">${c.value}</div>
+      <div class="c-desc">${c.desc}</div>
+    </div>
+  `).join('');
+}
+
+function renderCases() {
+  const grid = document.getElementById('casesGrid');
+  grid.innerHTML = CASES.map(c => `
+    <div class="case-card ${c.pass ? 'pass' : 'fail'}">
+      <div class="case-top">
+        <div>
+          <div class="case-name">${c.name} · ${c.label}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${c.desc}</div>
+        </div>
+        <span class="case-verdict">${c.verdict}</span>
+      </div>
+      <div class="case-chart">
+        <canvas class="caseCanvas" height="100"></canvas>
+      </div>
+      <div class="case-indicators">
+        ${c.indicators.map(ind => `
+          <div class="ind-item ${ind.ok ? 'ok' : 'bad'}">
+            <div class="i-label">${ind.label}</div>
+            <div class="i-value" style="color:${ind.ok ? '#2e7d32' : '#c62828'}">${ind.value}</div>
+            <div style="font-size:9px;color:var(--text2)">${ind.threshold}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  // Draw charts after DOM is ready
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.caseCanvas').forEach((canvas, i) => {
+      drawCaseChart(canvas, CASES[i].chartData);
+    });
+  });
+}
+
+// ============ INIT ============
+window.addEventListener('load', () => {
+  drawIdealChart();
+  renderConditions();
+  renderCases();
+});
+
+window.addEventListener('resize', drawIdealChart);
+</script>
+</body>
+</html>

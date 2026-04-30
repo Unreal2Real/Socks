@@ -5,6 +5,7 @@ __pycache__/
 data/scan_state.db
 results/
 report/
+data_cache/
 .env
 *.egg-info/
 dist/
