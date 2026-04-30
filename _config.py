@@ -6,18 +6,18 @@ TDX_PATH = os.environ.get('TDX_PATH', 'C:/zd_zsone')
 CACHE_DIR = os.path.join(PROJECT_ROOT, 'data', 'cache')
 
 FACTORY_PATTERN = {
-    'uptrend_gain': 0.10,
+    'uptrend_gain': 0.06,
     'consolidation_days_min': 10,
     'consolidation_days_max': 40,
     'bandwidth': 0.30,
-    'volatility': 0.20,
+    'volatility': 0.16,
     'volume_ratio': 1.5,
-    'max_retrace_pct': 0.15,
+    'max_retrace_pct': 0.10,
     'ma_periods': [5, 10, 20, 60],
     'bb_period': 20,
     'bb_std_dev': 2,
     'volume_ma_period': 20,
-    'uptrend_min_days': 5,
+    'uptrend_min_days': 8,
 }
 
 SCAN = {

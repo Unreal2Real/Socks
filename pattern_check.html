@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>厂字形态 — 理解对齐</title>
+<style>
+:root{--bg:#0f1117;--card:#1a1d28;--border:#2a2d3a;--text:#d1d4dc;--dim:#787b86;--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--accent:#3b82f6;--purple:#c084fc}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);padding:20px;max-width:1000px;margin:0 auto}
+h1{font-size:18px;margin-bottom:16px}
+h2{font-size:14px;margin:20px 0 8px;color:#fff}
+.box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
+canvas{display:block;margin:0 auto;border-radius:6px}
+.label-row{display:flex;gap:20px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+.label-row span{display:flex;align-items:center;gap:6px;font-size:11px}
+.legend-dot{width:10px;height:10px;border-radius:2px;display:inline-block}
+.desc{text-align:center;font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6}
+.question{background:rgba(245,158,11,.1);border:1px solid #f59e0b44;border-radius:8px;padding:14px;margin-top:12px}
+.question h3{font-size:13px;color:var(--orange);margin-bottom:6px}
+.question label{display:block;padding:6px 0;cursor:pointer;font-size:13px}
+.question input{margin-right:8px}
+</style>
+</head>
+<body>
+
+<h1>厂字形态 — 我理解的 vs 你说的，对齐一下</h1>
+
+<div class="box">
+  <h2>图解 A：我理解的「厂」字</h2>
+  <canvas id="c1" width="860" height="340"></canvas>
+  <div class="label-row">
+    <span><span class="legend-dot" style="background:var(--green)"></span>上涨段 (一竖一撇)</span>
+    <span><span class="legend-dot" style="background:var(--accent)"></span>盘整段 (一横)</span>
+    <span><span class="legend-dot" style="background:var(--orange)"></span>峰顶</span>
+    <span><span class="legend-dot" style="background:var(--red)"></span>允许的下跌容忍度</span>
+  </div>
+  <div class="desc">
+    股价先快速拉高(绿色)→ 然后在高位窄幅横盘(蓝色), 不跌回起点。<br>
+    像写"厂"字: 一竖一撇(涨) + 一横(横盘不跌)。 <br>
+    <strong>关键: 横盘段的均价要贴近峰顶，不能跌破。</strong>
+  </div>
+</div>
+
+<div class="box">
+  <h2>图解 B：「不是」厂字 (涨完跌回来了)</h2>
+  <canvas id="c2" width="860" height="340"></canvas>
+  <div class="desc">
+    涨到峰顶后，价格逐步跌回上涨起点附近 → 这不是厂字，只是普通反弹。
+  </div>
+</div>
+
+<div class="box">
+  <h2>图解 C：「不是」厂字 (压根没涨起来)</h2>
+  <canvas id="c3" width="860" height="340"></canvas>
+  <div class="desc">
+    涨幅太小(比如只涨了5%)，在图上几乎看不出来 → 不够成厂字。
+  </div>
+</div>
+
+<div class="question">
+  <h3>请判断：</h3>
+  <p style="font-size:12px;color:var(--dim);margin-bottom:8px">
+    上面三个图，哪个最接近你心中真正的「厂」字形态？
+  </p>
+  <label><input type="radio" name="choice" value="A">A - 符合，涨后横盘不跌就是厂字</label>
+  <label><input type="radio" name="choice" value="A1">A 方向对但横盘应该更贴近峰顶</label>
+  <label><input type="radio" name="choice" value="A2">A 方向对但上涨应该更陡/更持续</label>
+  <label><input type="radio" name="choice" value="B">B 和 C 都不是，但我对A也有一些补充</label>
+  <p style="font-size:11px;color:var(--dim);margin-top:10px">
+    (选择后告诉我你的判断，我继续调整)
+  </p>
+</div>
+
+<script>
+function drawChart(canvasId, config, annotations) {
+  const c = document.getElementById(canvasId);
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  const M = {t:40, r:50, b:50, l:60};
+  const PW = W - M.l - M.r;
+  const PH = H - M.t - M.b;
+
+  ctx.fillStyle = '#1a1d28';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = '#2a2d3a'; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 10; i++) {
+    let y = M.t + PH*i/10;
+    ctx.beginPath(); ctx.moveTo(M.l,y); ctx.lineTo(W-M.r,y); ctx.stroke();
+  }
+
+  const days = config.days || 70;
+  const prices = config.prices;
+
+  const maxP = Math.max(...prices) * 1.08;
+  const minP = Math.min(...prices) * 0.92;
+  const scale = PH / (maxP - minP);
+  const yPos = v => M.t + PH - (v - minP) * scale;
+  const xPos = i => M.l + PW * i / days;
+
+  // Zones
+  for (const zone of (config.zones || [])) {
+    const x1 = xPos(zone.start), x2 = xPos(zone.end);
+    ctx.fillStyle = zone.color + '18';
+    ctx.fillRect(x1, M.t, x2-x1, PH);
+    ctx.strokeStyle = zone.color + '44';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x1, M.t, x2-x1, PH);
+    ctx.fillStyle = zone.color;
+    ctx.font = 'bold 12px system-ui';
+    ctx.fillText(zone.label, x1+6, M.t+16);
+  }
+
+  // Price line (area fill)
+  ctx.beginPath();
+  prices.forEach((p,i) => {
+    if (i===0) ctx.moveTo(xPos(i), yPos(p));
+    else ctx.lineTo(xPos(i), yPos(p));
+  });
+  const lastX = xPos(prices.length-1), baseLine = yPos(minP*1.0);
+  ctx.lineTo(lastX, baseLine);
+  ctx.lineTo(xPos(0), baseLine);
+  ctx.closePath();
+  ctx.fillStyle = '#d1d4dc10';
+  ctx.fill();
+
+  // Price line
+  ctx.beginPath();
+  ctx.strokeStyle = '#d1d4dc';
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  prices.forEach((p,i) => {
+    if (i===0) ctx.moveTo(xPos(i), yPos(p));
+    else ctx.lineTo(xPos(i), yPos(p));
+  });
+  ctx.stroke();
+
+  // Annotations
+  for (const ann of (annotations || [])) {
+    const ax = xPos(ann.day);
+    const ay = yPos(ann.price || prices[ann.day]);
+    if (ann.type === 'dot') {
+      ctx.fillStyle = ann.color;
+      ctx.beginPath(); ctx.arc(ax, ay, ann.r||5, 0, Math.PI*2); ctx.fill();
+      if (ann.text) {
+        ctx.fillStyle = ann.color;
+        ctx.font = 'bold 11px system-ui';
+        ctx.fillText(ann.text, ax + (ann.tx||10), ay + (ann.ty||0));
+      }
+    } else if (ann.type === 'harrow') {
+      // Double-headed vertical arrow
+      const y1 = yPos(ann.y1);
+      const y2 = yPos(ann.y2);
+      ctx.strokeStyle = ann.color; ctx.lineWidth = 2; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(ax, y1); ctx.lineTo(ax, y2); ctx.stroke();
+      // Arrow tips
+      ctx.beginPath(); ctx.moveTo(ax-5, y1+8); ctx.lineTo(ax, y1); ctx.lineTo(ax+5, y1+8); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ax-5, y2-8); ctx.lineTo(ax, y2); ctx.lineTo(ax+5, y2-8); ctx.stroke();
+      if (ann.text) {
+        ctx.fillStyle = ann.color;
+        ctx.font = 'bold 11px system-ui';
+        const pct = Math.abs((ann.y1-ann.y2)/ann.y1*100).toFixed(1);
+        ctx.fillText(ann.text + ' ' + pct + '%', ax + (ann.tx||10), (y1+y2)/2);
+      }
+    } else if (ann.type === 'hline') {
+      ctx.strokeStyle = ann.color; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+      ctx.beginPath(); ctx.moveTo(M.l, yPos(ann.price)); ctx.lineTo(W-M.r, yPos(ann.price)); ctx.stroke();
+      ctx.setLineDash([]);
+      if (ann.text) {
+        ctx.fillStyle = ann.color;
+        ctx.font = '10px system-ui';
+        ctx.fillText(ann.text, W-M.r-120, yPos(ann.price)-6);
+      }
+    }
+  }
+
+  // X axis labels
+  ctx.fillStyle = '#787b86'; ctx.font = '10px system-ui';
+  for (let i = 0; i <= days; i += 10) {
+    ctx.fillText(i, xPos(i)-4, H-M.b+16);
+  }
+  ctx.fillText('时间 (天)', W/2-20, H-6);
+}
+
+// ============ Chart A: IDEAL ============
+const daysA = 70;
+const pricesA = [];
+// Pre: flat 0-10
+for (let i=0;i<10;i++) pricesA.push(10 + Math.random()*0.2);
+// UPTREND: 10-28, steep
+for (let i=0;i<18;i++) {
+  let progress = i/18;
+  let p = 10.2 + progress*3.5 + Math.pow(progress,1.5)*1.0;
+  pricesA.push(p + (Math.random()-0.5)*0.15);
+}
+const peakA = pricesA[pricesA.length-1]; // ~14.7
+// CONSOLIDATION: 28-65, flat near peak
+for (let i=0;i<37;i++) {
+  pricesA.push(peakA + (Math.random()-0.5)*0.6); // ±0.3 around peak
+}
+// Slight bump at end
+for (let i=0;i<5;i++) pricesA.push(peakA + 0.2 + Math.random()*0.3);
+
+drawChart('c1', {
+  days: daysA, prices: pricesA,
+  zones: [
+    {start:10, end:28, color:'#22c55e', label:'上涨段 (+50%)'},
+    {start:28, end:65, color:'#3b82f6', label:'盘整段 (横盘不跌)'},
+  ]
+}, [
+  {type:'dot', day:28, price:peakA, color:'#f59e0b', r:6, text:'峰顶 ¥14.7', tx:10, ty:-8},
+  {type:'harrow', day:40, y1:peakA, y2:peakA*0.96, color:'#ef4444', text:'', tx:12},
+  {type:'hline', day:0, price:peakA*0.96, color:'#ef4444', text:'回撤容忍线 (-4%)'},
+  {type:'dot', day:10, color:'#22c55e', r:4, text:'起涨', tx:-30, ty:-10},
+]);
+
+// ============ Chart B: FELL BACK ============
+const daysB = 70;
+const pricesB = [];
+for (let i=0;i<10;i++) pricesB.push(10 + Math.random()*0.2);
+for (let i=0;i<18;i++) {
+  let p = 10.2 + (i/18)*4;
+  pricesB.push(p + (Math.random()-0.5)*0.15);
+}
+const peakB = pricesB[pricesB.length-1];
+// Then fall back
+for (let i=0;i<42;i++) {
+  let fall = peakB * (1 - i/42 * 0.38);
+  pricesB.push(fall + (Math.random()-0.5)*0.3);
+}
+
+drawChart('c2', {
+  days: daysB, prices: pricesB,
+  zones: [
+    {start:10, end:28, color:'#22c55e', label:'上涨段'},
+    {start:28, end:68, color:'#ef4444', label:'跌回起涨点附近'},
+  ]
+}, [
+  {type:'dot', day:28, price:peakB, color:'#f59e0b', r:6, text:'峰顶', tx:10, ty:-8},
+  {type:'harrow', day:45, y1:peakB, y2:peakB*0.7, color:'#ef4444', text:'', tx:12},
+]);
+
+// ============ Chart C: TOO WEAK ============
+const daysC = 70;
+const pricesC = [];
+for (let i=0;i<10;i++) pricesC.push(10 + Math.random()*0.15);
+for (let i=0;i<15;i++) pricesC.push(10.1 + (i/15)*0.6); // only 6% gain
+const peakC = pricesC[pricesC.length-1];
+for (let i=0;i<45;i++) pricesC.push(peakC + (Math.random()-0.5)*0.3);
+
+drawChart('c3', {
+  days: daysC, prices: pricesC,
+  zones: [
+    {start:10, end:25, color:'#f59e0b55', label:'微涨 (+6%)'},
+    {start:25, end:68, color:'#787b8655', label:'(涨幅太小，不构成厂字)'},
+  ]
+}, [
+  {type:'dot', day:25, price:peakC, color:'#f59e0b', r:6, text:'仅涨6%', tx:10, ty:-8},
+]);
+</script>
+</body>
+</html>

@@ -92,6 +92,9 @@ class PatternRecognizer:
 
             current_gain = (current_price - start_price) / start_price
             if current_gain >= self.uptrend_gain_threshold:
+                uptrend_days = i - start_idx + 1
+                if uptrend_days < self.uptrend_min_days:
+                    continue
                 for j in range(i + 1, min(i + 5, len(df))):
                     if df.loc[j, 'close'] < df.loc[j, 'ma5']:
                         return peak_idx, (peak_price - start_price) / start_price
@@ -116,10 +119,15 @@ class PatternRecognizer:
 
         peak_price = period_df.iloc[0]['close']
         min_close = period_df['close'].min()
+        avg_close = period_df['close'].mean()
 
         retrace = (peak_price - min_close) / peak_price
         retrace_limit = self.max_retrace_pct * 1.3 if ongoing else self.max_retrace_pct
         if retrace > retrace_limit:
+            return False
+
+        avg_drop = (peak_price - avg_close) / peak_price
+        if avg_drop > self.max_retrace_pct * 0.6:
             return False
 
         avg_bandwidth = period_df['bb_bandwidth'].mean()
