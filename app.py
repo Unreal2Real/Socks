@@ -85,6 +85,11 @@ def api_scan_results():
     return jsonify({'code': 0, 'data': engine.results()})
 
 
+@app.route('/api/scan/last')
+def api_scan_last():
+    return jsonify({'code': 0, 'data': engine.last_scan()})
+
+
 @app.route('/api/scan/stop', methods=['POST'])
 def api_scan_stop():
     engine.stop()

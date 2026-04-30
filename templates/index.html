@@ -36,6 +36,9 @@ tr{cursor:pointer}
 .tag{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
 .tag-green{background:rgba(34,197,94,.15);color:var(--green)}
 .tag-orange{background:rgba(245,158,11,.15);color:var(--orange)}
+.tag-blue{background:rgba(59,130,246,.15);color:var(--accent)}
+.tag-red{background:rgba(239,68,68,.15);color:var(--red)}
+.tag-gray{background:rgba(120,123,134,.15);color:var(--dim)}
 .pattern-info{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:12px}
 .pattern-info .item{background:rgba(255,255,255,.03);padding:8px 10px;border-radius:4px}
 .pattern-info .label{font-size:11px;color:var(--dim)}.pattern-info .value{font-size:14px;font-weight:600}
@@ -66,6 +69,7 @@ tr{cursor:pointer}
     <button class="btn-danger" id="btnStop" onclick="stopScan()" disabled>⏹ 停止</button>
   </div>
   <div class="status" id="scanStatus">就绪</div>
+  <div class="status" id="lastScanInfo" style="display:none"></div>
   <div class="progress-wrap"><div class="progress-bar" id="scanProgress"></div></div>
   <div id="scanLog" class="log"></div>
   <div id="scanResults" style="margin-top:12px"></div>
@@ -234,25 +238,53 @@ async function pollProgress() {
       const rj = await rr.json();
       showResults(rj.data);
     }
-    if (!d.running) { stopPolling(); resetScanBtn(); addLog('ok', d.progress>0 ? `扫描完成！共 ${d.total} 只，匹配 ${d.matched} 只` : '扫描结束'); }
+    if (!d.running) { stopPolling(); resetScanBtn(); addLog('ok', d.progress>0 ? `扫描完成！共 ${d.total} 只，匹配 ${d.matched} 只` : '扫描结束');
+      loadLastScan();
+    }
   } catch(e) {}
 }
 
 function showResults(results) {
   const el = document.getElementById('scanResults');
   if (!results.length) { el.innerHTML = '<p style="color:var(--dim);padding:16px">未发现匹配形态</p>'; return; }
-  let html = '<table><thead><tr><th>代码</th><th>名称</th><th>评分</th><th>涨幅</th><th>盘整</th><th>日期</th></tr></thead><tbody>';
+
+  const statusLabel = {new:'🆕 新增', kept:'✅ 保持', changed:'📈 变化', exited:'🚫 退出'};
+  const statusTag = {new:'tag-green', kept:'tag-blue', changed:'tag-orange', exited:'tag-gray'};
+
+  let html = '<table><thead><tr><th>代码</th><th>名称</th><th>评分</th><th>涨幅</th><th>盘整</th><th>状态</th><th>日期</th></tr></thead><tbody>';
   results.forEach(p => {
-    html += `<tr onclick="viewStock('${p.stock_code}')">
+    const st = p.status || 'new';
+    html += `<tr onclick="viewStock('${p.stock_code}')"${st==='exited'?' style="opacity:.5"':''}>
       <td><code>${p.stock_code}</code></td><td>${p.stock_name}</td>
       <td><span class="tag tag-green">${p.pattern_score.toFixed(2)}</span></td>
       <td style="color:var(--green)">+${(p.uptrend_gain*100).toFixed(1)}%</td>
       <td>${p.consolidation_days}天</td>
-      <td>${p.uptrend_start_date} → ${p.consolidation_end_date}</td></tr>`;
+      <td><span class="tag ${statusTag[st]||'tag-gray'}">${statusLabel[st]||st}</span></td>
+      <td>${p.consolidation_end_date}</td></tr>`;
   });
   html += '</tbody></table>';
   el.innerHTML = html;
 }
+
+async function loadLastScan() {
+  try {
+    const r = await fetch('/api/scan/last');
+    const j = await r.json();
+    const d = j.data;
+    if (d.last_scan) {
+      document.getElementById('lastScanInfo').style.display = '';
+      document.getElementById('lastScanInfo').innerHTML = `上次扫描: ${d.last_scan} | 匹配: ${d.data.filter(x=>x.status!=='exited').length} 只 | 已退出: ${d.data.filter(x=>x.status==='exited').length} 只`;
+      if (d.data.length) showResults(d.data);
+    }
+    const pr = await fetch('/api/scan/progress');
+    const pj = await pr.json();
+    if (pj.data.last_scan && !pj.data.running) {
+      document.getElementById('lastScanInfo').style.display = '';
+    }
+  } catch(e) {}
+}
+
+window.addEventListener('DOMContentLoaded', loadLastScan);
 
 function viewStock(code) {
   document.getElementById('stockCode').value = code;

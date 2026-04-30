@@ -1,8 +1,13 @@
+import json
+import os
 import threading
 import time
+from datetime import datetime
 from data.fetcher import DataFetcher
 from pattern.recognizer import PatternRecognizer
-from _config import FACTORY_PATTERN, SCAN
+from _config import FACTORY_PATTERN, SCAN, PROJECT_ROOT
+
+RESULTS_DIR = os.path.join(PROJECT_ROOT, 'results')
 
 
 class ScanEngine:
@@ -19,6 +24,9 @@ class ScanEngine:
         self._results = []
         self._errors = 0
         self._current_code = ''
+        self._last_scan_time = None
+        self._scan_limit = 0
+        os.makedirs(RESULTS_DIR, exist_ok=True)
 
     def start(self, limit: int = 0, max_days_back: int = None) -> str:
         with self._lock:
@@ -29,6 +37,7 @@ class ScanEngine:
             self._results = []
             self._errors = 0
             self._current_code = ''
+            self._scan_limit = limit
             import uuid
             self._task_id = uuid.uuid4().hex[:8]
 
@@ -53,11 +62,84 @@ class ScanEngine:
                 'matched': len(self._results),
                 'errors': self._errors,
                 'current': self._current_code,
+                'last_scan': self._last_scan_time,
             }
 
     def results(self) -> list:
         with self._lock:
-            return sorted(list(self._results), key=lambda x: x.get('pattern_score', 0), reverse=True)
+            return sorted(list(self._results),
+                          key=lambda x: x.get('pattern_score', 0), reverse=True)
+
+    def _save_results(self):
+        with self._lock:
+            results = list(self._results)
+            scan_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            total_scanned = self._progress
+            scan_limit = self._scan_limit
+
+        if not results:
+            return
+
+        save_data = {
+            'scan_time': scan_time,
+            'total_scanned': total_scanned,
+            'limit': scan_limit,
+            'matched': len(results),
+            'results': results,
+        }
+
+        path = os.path.join(RESULTS_DIR, 'latest_scan.json')
+        tmp = path + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(save_data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, path)
+
+        ts_file = os.path.join(RESULTS_DIR, f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+        with open(ts_file, 'w', encoding='utf-8') as f:
+            json.dump(save_data, f, ensure_ascii=False, indent=2)
+
+        self._last_scan_time = scan_time
+
+    def last_scan(self) -> dict:
+        with self._lock:
+            results = list(self._results)
+            last_scan = self._last_scan_time
+
+        prev_results = {}
+        path = os.path.join(RESULTS_DIR, 'latest_scan.json')
+        if os.path.exists(path) and not results:
+            try:
+                prev_data = json.loads(open(path, 'r', encoding='utf-8').read())
+                last_scan = prev_data.get('scan_time', '')
+                for r in prev_data.get('results', []):
+                    prev_results[r['stock_code']] = r
+            except Exception:
+                pass
+
+        current_codes = set()
+        for r in results:
+            code = r['stock_code']
+            current_codes.add(code)
+            prev = prev_results.get(code)
+            if prev is None:
+                r['status'] = 'new'
+            elif prev.get('pattern_score', 0) == r.get('pattern_score', 0):
+                r['status'] = 'kept'
+            else:
+                r['status'] = 'changed'
+
+        for code, r in prev_results.items():
+            if code not in current_codes:
+                r['status'] = 'exited'
+                results.append(r)
+
+        return {
+            'last_scan': last_scan,
+            'data': sorted(results,
+                           key=lambda x: (0 if x.get('status') != 'exited' else 1,
+                                          x.get('pattern_score', 0)),
+                           reverse=(len([r for r in results if r.get('status') != 'exited']) > 0)),
+        }
 
     def _run(self, limit: int, max_days_back: int):
         stocks = self.fetcher.stock_list()
@@ -100,6 +182,8 @@ class ScanEngine:
 
             with self._lock:
                 self._progress += 1
+
+        self._save_results()
 
         with self._lock:
             self._running = False
