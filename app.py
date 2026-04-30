@@ -26,8 +26,21 @@ def api_health():
     return jsonify({'status': 'ok'})
 
 
+@app.route('/api/stock/list')
+def api_stock_list():
+    try:
+        stocks = fetcher.stock_list()
+        if not stocks:
+            raise Exception('无法获取股票列表，请稍后重试')
+        return jsonify({'code': 0, 'data': [{'code': c, 'name': n} for c, n in stocks]})
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': str(e)})
+
+
 @app.route('/api/stock/<code>')
 def api_stock(code):
+    if code == 'list':
+        return api_stock_list()
     days = int(request.args.get('days', 250))
     df = fetcher.daily_data(code, days=days)
     if df.empty:

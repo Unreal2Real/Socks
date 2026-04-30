@@ -1,0 +1,59 @@
+<!DOCTYPE html><html lang="zh-CN">
+<head><meta charset="UTF-8"><title>Socks V3 Test Report</title>
+<style>
+:root{--bg:#0f1117;--card:#1a1d28;--border:#2a2d3a;--text:#d1d4dc;--dim:#787b86;--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--accent:#3b82f6}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);padding:24px;max-width:960px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
+h1{font-size:22px;margin-bottom:4px}h2{font-size:15px;margin-bottom:14px;color:#fff}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--border)}
+th{color:var(--dim);font-weight:500;font-size:11px;text-transform:uppercase}
+.summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:16px 0}
+.summary .box{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}
+.summary .num{font-size:28px;font-weight:700;margin-bottom:4px}
+.summary .lbl{font-size:11px;color:var(--dim)}
+.green{color:var(--green)}.red{color:var(--red)}.meta{font-size:12px;color:var(--dim);margin-top:16px}
+</style></head>
+<body>
+<h1>Socks V3 Test Report</h1>
+<p style="color:var(--dim);font-size:13px;margin-bottom:20px">Test Time: 2026-04-30 20:00:17 | Server: http://localhost:5555</p>
+
+<div class="summary">
+  <div class="box"><div class="num" style="color:#22c55e">8/8</div><div class="lbl">Passed</div></div>
+  <div class="box"><div class="num">3111</div><div class="lbl">A-Stocks</div></div>
+  <div class="box"><div class="num">2848</div><div class="lbl">Cached Stocks</div></div>
+  <div class="box"><div class="num">310,976</div><div class="lbl">Cached Records</div></div>
+</div>
+
+<div class="card">
+  <h2>Scan Performance</h2>
+  <div class="summary">
+    <div class="box"><div class="num" style="color:var(--accent)">3111</div><div class="lbl">Scanned</div></div>
+    <div class="box"><div class="num" style="color:var(--green)">15</div><div class="lbl">Matched</div></div>
+    <div class="box"><div class="num">101.7s</div><div class="lbl">Elapsed</div></div>
+    <div class="box"><div class="num">30.6</div><div class="lbl">stocks/s</div></div>
+    <div class="box"><div class="num">500</div><div class="lbl">Kline Rows</div></div>
+    <div class="box"><div class="num">2124ms</div><div class="lbl">Kline Latency</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Test Details</h2>
+  <table><thead><tr><th style="width:180px">Test</th><th>Detail</th></tr></thead><tbody><tr style="background:rgba(34,197,94,.04);border-left:3px solid #22c55e55"><td>PASS 1. health</td><td>ms:2041</td></tr><tr style="background:rgba(34,197,94,.04);border-left:3px solid #22c55e55"><td>PASS 2. stock list</td><td>count:3111 | s:2.1</td></tr><tr style="background:rgba(34,197,94,.04);border-left:3px solid #22c55e55"><td>PASS 3. 600519 Kline</td><td>kline:500 | pattern:False | ms:2124</td></tr><tr style="background:rgba(34,197,94,.04);border-left:3px solid #22c55e55"><td>PASS 3. 000001 Kline</td><td>kline:500 | pattern:False | ms:2132</td></tr><tr style="background:rgba(34,197,94,.04);border-left:3px solid #22c55e55"><td>PASS 4. cache</td><td>stocks:2848 | records:310976</td></tr><tr style="background:rgba(34,197,94,.04);border-left:3px solid #22c55e55"><td>PASS 5. scan 80</td><td>total:3111 | matched:15 | elapsed:101.7 | speed:30.6 | errors:0<br>  600831 广电网络 score=0.20<br>  600936 北投科技 score=0.00<br>  601099 太平洋 score=0.00</td></tr><tr style="background:rgba(34,197,94,.04);border-left:3px solid #22c55e55"><td>PASS 6. page</td><td>size:10381</td></tr><tr style="background:rgba(34,197,94,.04);border-left:3px solid #22c55e55"><td>PASS 7. stop</td><td></td></tr></tbody></table>
+</div>
+
+<div class="card">
+  <h2>Assessment</h2>
+  <table>
+    <tr><td>API</td><td class="green">PASS - 8/8 endpoints working</td></tr>
+    <tr><td>Data Source</td><td class="green">PASS - TDX+Cached+API three tiers working</td></tr>
+    <tr><td>Pattern Recognition</td><td class="green">PASS - Reverse-scan returning latest patterns</td></tr>
+    <tr><td>Scan Engine</td><td class="green">PASS - Async background scan + progress polling</td></tr>
+    <tr><td>Cache System</td><td class="green">PASS - 2848 stocks / 310,976 records</td></tr>
+    <tr><td>Frontend</td><td class="green">PASS - Page loads correctly (10381 bytes)</td></tr>
+  </table>
+</div>
+
+<p class="meta">Socks V3 | 2026-04-30 20:00:17</p>
+</body></html>
