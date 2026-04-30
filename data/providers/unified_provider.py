@@ -29,6 +29,16 @@ class UnifiedProvider(DataProvider):
             except Exception:
                 self._bs = None
 
+    def _init_quotes_client(self):
+        if self.quotes_client is None:
+            try:
+                from mootdx.quotes import Quotes
+                self.quotes_client = Quotes.factory(market='std', timeout=10, retry=3)
+            except ImportError:
+                self.quotes_client = None
+            except Exception:
+                self.quotes_client = None
+
     def _get_from_tdx(self, stock_code: str) -> pd.DataFrame:
         self._init_tdx_reader()
         if self.tdx_reader:

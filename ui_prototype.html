@@ -254,6 +254,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
   margin-top: 10px;
 }
 .log-line { white-space: pre-wrap; }
+.log-line.info { color: var(--text-secondary); }
 .log-line.ok { color: var(--green); }
 .log-line.warn { color: var(--orange); }
 .log-line.err { color: var(--red); }
@@ -728,7 +729,7 @@ async function runScan() {
 
   function addLog(type, message) {
     const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-    const className = type === 'error' ? 'err' : (type === 'warn' ? 'warn' : 'ok');
+    const className = type === 'error' ? 'err' : (type === 'warn' ? 'warn' : (type === 'info' || type === 'progress') ? 'info' : 'ok');
     logPanel.innerHTML = `<div class="log-line ${className}">[${time}] ${message}</div>` + logPanel.innerHTML;
     if (logPanel.children.length > 50) {
       logPanel.removeChild(logPanel.lastChild);

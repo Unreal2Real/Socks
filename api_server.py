@@ -149,13 +149,25 @@ def scan_progress():
             matched = []
             count = 0
             last_log_time = time.time()
+            last_heartbeat_time = time.time()
             log_interval = 0.3
+            heartbeat_interval = 10.0
             start_time = time.time()
             scan_total = len(stocks)
 
             yield f"event: start\ndata: {{'type':'start','total':{scan_total},'total_stocks':{total_stocks},'limit':{limit_val}}}\n\n"
 
             for code, name in stocks:
+                now = time.time()
+
+                if now - last_heartbeat_time >= heartbeat_interval:
+                    try:
+                        yield f"event: ping\ndata: {{'type':'ping','time':{now}}}\n\n"
+                        request.environ.get('wsgi.input', object()).closed
+                    except (BrokenPipeError, OSError):
+                        return
+                    last_heartbeat_time = now
+
                 try:
                     df = provider.get_daily_data(code, days=config.get('min_days', 60))
                     if df.empty or len(df) < config.get('min_days', 60):
@@ -191,6 +203,8 @@ def scan_progress():
                         yield f"event: progress\ndata: {{'type':'progress','count':{count},'total':{scan_total},'matched':{len(matched)},'progress':{progress:.1f},'code':'{code}','speed':{speed:.1f}}}\n\n"
                         last_log_time = current_time
 
+                except (BrokenPipeError, OSError):
+                    return
                 except Exception as e:
                     count += 1
                     continue
@@ -258,7 +272,7 @@ def scan():
                         'consolidation_end_date': pattern.get('consolidation_end_date', '')
                     })
             except Exception as e:
-                pass
+                print(f"扫描异常 {code} {name}: {e}")
 
             count += 1
 
@@ -386,4 +400,4 @@ def cache_clear():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5555))
     print(f"启动 API 服务 http://localhost:{port}")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, threaded=True, debug=False)
