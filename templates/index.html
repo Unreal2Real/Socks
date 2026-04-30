@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>厂字形态扫描器</title>
+<style>
+:root{--bg:#0f1117;--card:#1a1d28;--border:#2a2d3a;--text:#d1d4dc;
+  --dim:#787b86;--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--accent:#3b82f6;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg);color:var(--text);padding:16px}
+h2{font-size:16px;margin-bottom:12px;color:#fff}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+input,select,button{padding:8px 12px;border-radius:6px;border:1px solid var(--border);
+  background:var(--bg);color:var(--text);font-size:14px}
+button{cursor:pointer;font-weight:500;transition:all .2s}
+button:hover{opacity:.9}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-success{background:var(--green);color:#fff;border-color:var(--green)}
+.btn-danger{background:var(--red);color:#fff;border-color:var(--red)}
+.btn-sm{padding:4px 10px;font-size:12px}
+input{width:120px}
+#kline-chart{width:100%;height:400px}
+.progress-wrap{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:8px 0}
+.progress-bar{height:100%;background:var(--accent);width:0;transition:width .3s}
+.log{max-height:200px;overflow-y:auto;font-size:12px;font-family:monospace;line-height:1.6}
+.log .info{color:var(--dim)}.log .ok{color:var(--green)}
+.log .warn{color:var(--orange)}.log .err{color:var(--red)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}
+th{color:var(--dim);font-weight:500;font-size:12px;text-transform:uppercase}
+tr:hover{background:rgba(59,130,246,.05)}
+tr{cursor:pointer}
+.tag{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
+.tag-green{background:rgba(34,197,94,.15);color:var(--green)}
+.tag-orange{background:rgba(245,158,11,.15);color:var(--orange)}
+.pattern-info{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:12px}
+.pattern-info .item{background:rgba(255,255,255,.03);padding:8px 10px;border-radius:4px}
+.pattern-info .label{font-size:11px;color:var(--dim)}.pattern-info .value{font-size:14px;font-weight:600}
+.status{font-size:13px;color:var(--dim);margin:4px 0}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h2>📈 个股分析</h2>
+  <div class="row">
+    <input id="stockCode" type="text" placeholder="股票代码" value="600519">
+    <button class="btn-primary" onclick="analyzeStock()">分析</button>
+    <span id="stockName" style="font-weight:600"></span>
+  </div>
+  <div id="kline-chart"></div>
+  <div id="patternDetail" class="pattern-info" style="display:none"></div>
+</div>
+
+<div class="card">
+  <h2>🔍 大盘扫描</h2>
+  <div class="row">
+    <select id="scanMode">
+      <option value="200">增量扫描（200只）</option>
+      <option value="0">全量扫描（全部）</option>
+    </select>
+    <button class="btn-primary" id="btnStart" onclick="startScan()">▶ 开始扫描</button>
+    <button class="btn-danger" id="btnStop" onclick="stopScan()" disabled>⏹ 停止</button>
+  </div>
+  <div class="status" id="scanStatus">就绪</div>
+  <div class="progress-wrap"><div class="progress-bar" id="scanProgress"></div></div>
+  <div id="scanLog" class="log"></div>
+  <div id="scanResults" style="margin-top:12px"></div>
+</div>
+
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+let chart = null, candleSeries = null, volumeSeries = null, lineSeries = {};
+let scanTimer = null;
+
+function createChart() {
+  const el = document.getElementById('kline-chart');
+  if (chart) { el.innerHTML = ''; chart = null; }
+  chart = LightweightCharts.createChart(el, {
+    layout: { background: { color: '#1a1d28' }, textColor: '#d1d4dc' },
+    grid: { vertLines: { color: '#2a2d3a' }, horzLines: { color: '#2a2d3a' } },
+    crosshair: { mode: 0 }, rightPriceScale: { borderColor: '#2a2d3a' },
+    timeScale: { borderColor: '#2a2d3a', timeVisible: true }
+  });
+  candleSeries = chart.addCandlestickSeries({
+    upColor: '#22c55e', downColor: '#ef4444', borderUpColor: '#22c55e',
+    borderDownColor: '#ef4444', wickUpColor: '#22c55e', wickDownColor: '#ef4444'
+  });
+  volumeSeries = chart.addHistogramSeries({
+    priceFormat: { type: 'volume' }, priceScaleId: '',
+  });
+  chart.priceScale('').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+  volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+  ['ma5','ma10','ma20'].forEach(k => {
+    lineSeries[k] = chart.addLineSeries({ color: k==='ma5'?'#f59e0b':k==='ma10'?'#3b82f6':'#a855f7', lineWidth: 1, priceScaleId: 'right' });
+  });
+}
+
+async function analyzeStock() {
+  const code = document.getElementById('stockCode').value.trim();
+  if (!code) return;
+  document.getElementById('patternDetail').style.display = 'none';
+  try {
+    const r = await fetch(`/api/stock/${code}?days=500`);
+    const j = await r.json();
+    if (j.code !== 0) return alert(j.msg);
+    renderKline(j.data);
+    renderPattern(j.pattern);
+  } catch(e) { alert('加载失败: '+e.message); }
+}
+
+function renderKline(data) {
+  if (!chart) createChart();
+  const candles = [], volumes = [], maData = {ma5:[],ma10:[],ma20:[]};
+  data.forEach((d,i) => {
+    const t = d.time.includes('-') ? d.time : d.time.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3');
+    candles.push({time:t,open:d.open,high:d.high,low:d.low,close:d.close});
+    volumes.push({time:t,value:d.volume,color: d.close>=d.open?'rgba(34,197,94,.3)':'rgba(239,68,68,.3)'});
+  });
+  candleSeries.setData(candles);
+  volumeSeries.setData(volumes);
+  for (let i = 0; i < data.length; i++) {
+    const t = data[i].time.includes('-') ? data[i].time : data[i].time.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3');
+    for (let p of [5,10,20]) {
+      if (i >= p-1) {
+        let sum = 0; for (let j=i-p+1;j<=i;j++) sum += data[j].close;
+        maData['ma'+p].push({time:t, value:sum/p});
+      }
+    }
+  }
+  Object.entries(maData).forEach(([k,v]) => { if (v.length) lineSeries[k].setData(v); });
+  chart.timeScale().fitContent();
+}
+
+function renderPattern(p) {
+  const el = document.getElementById('patternDetail');
+  if (!p) { el.style.display='none'; return; }
+  el.style.display = 'grid';
+  el.innerHTML = `
+    <div class="item"><div class="label">形态类型</div><div class="value">厂字形态</div></div>
+    <div class="item"><div class="label">综合评分</div><div class="value">${p.pattern_score.toFixed(2)}</div></div>
+    <div class="item"><div class="label">上涨涨幅</div><div class="value" style="color:var(--green)">+${(p.uptrend_gain*100).toFixed(1)}%</div></div>
+    <div class="item"><div class="label">盘整天数</div><div class="value">${p.consolidation_days}天</div></div>
+    <div class="item"><div class="label">上涨段</div><div class="value">${p.uptrend_start_date} → ${p.uptrend_end_date}</div></div>
+    <div class="item"><div class="label">盘整段</div><div class="value">${p.consolidation_start_date} → ${p.consolidation_end_date}</div></div>
+  `;
+}
+
+function addLog(type, msg) {
+  const el = document.getElementById('scanLog');
+  const t = new Date().toLocaleTimeString('zh-CN',{hour12:false});
+  const cls = type==='err'?'err':type==='warn'?'warn':type==='ok'?'ok':'info';
+  el.innerHTML = `<div class="${cls}">[${t}] ${msg}</div>` + el.innerHTML;
+  if (el.children.length > 40) el.removeChild(el.lastChild);
+}
+
+async function startScan() {
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStop').disabled = false;
+  document.getElementById('scanResults').innerHTML = '';
+  document.getElementById('scanLog').innerHTML = '';
+  const mode = parseInt(document.getElementById('scanMode').value);
+  addLog('info', mode===0?'启动全量扫描…':'启动增量扫描（200只）…');
+  try {
+    const r = await fetch('/api/scan/start', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({limit:mode})});
+    const j = await r.json();
+    if (j.code !== 0) return addLog('err','启动失败: '+j.msg);
+    addLog('info','扫描已启动');
+    scanTimer = setInterval(pollProgress, 1000);
+    pollProgress();
+  } catch(e) { addLog('err','请求失败: '+e.message); resetScanBtn(); }
+}
+
+async function pollProgress() {
+  try {
+    const r = await fetch('/api/scan/progress');
+    const j = await r.json();
+    const d = j.data;
+    document.getElementById('scanProgress').style.width = d.percent+'%';
+    document.getElementById('scanStatus').innerText = d.running
+      ? `扫描中 ${d.progress}/${d.total} (${d.percent}%) | 已匹配 ${d.matched} | 当前: ${d.current}`
+      : `已完成 ${d.progress}/${d.total} | 匹配 ${d.matched} 只`;
+    if (d.matched > 0 && !d.running) {
+      const rr = await fetch('/api/scan/results');
+      const rj = await rr.json();
+      showResults(rj.data);
+    }
+    if (!d.running) { stopPolling(); resetScanBtn(); addLog('ok', d.progress>0 ? `扫描完成！共 ${d.total} 只，匹配 ${d.matched} 只` : '扫描结束'); }
+  } catch(e) {}
+}
+
+function showResults(results) {
+  const el = document.getElementById('scanResults');
+  if (!results.length) { el.innerHTML = '<p style="color:var(--dim);padding:16px">未发现匹配形态</p>'; return; }
+  let html = '<table><thead><tr><th>代码</th><th>名称</th><th>评分</th><th>涨幅</th><th>盘整</th><th>日期</th></tr></thead><tbody>';
+  results.forEach(p => {
+    html += `<tr onclick="viewStock('${p.stock_code}')">
+      <td><code>${p.stock_code}</code></td><td>${p.stock_name}</td>
+      <td><span class="tag tag-green">${p.pattern_score.toFixed(2)}</span></td>
+      <td style="color:var(--green)">+${(p.uptrend_gain*100).toFixed(1)}%</td>
+      <td>${p.consolidation_days}天</td>
+      <td>${p.uptrend_start_date} → ${p.consolidation_end_date}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function viewStock(code) {
+  document.getElementById('stockCode').value = code;
+  analyzeStock();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function stopScan() {
+  fetch('/api/scan/stop',{method:'POST'});
+  stopPolling();
+  resetScanBtn();
+  addLog('warn','已请求停止扫描');
+}
+
+function stopPolling() { if (scanTimer) { clearInterval(scanTimer); scanTimer = null; } }
+function resetScanBtn() { document.getElementById('btnStart').disabled=false; document.getElementById('btnStop').disabled=true; }
+
+createChart();
+</script>
+</body>
+</html>
