@@ -2,9 +2,12 @@ import os
 import sys
 import json
 import time
+import socket
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
+
+socket.setdefaulttimeout(15)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -37,12 +40,15 @@ def health():
 
 @app.route('/api/stock/list')
 def stock_list():
-    provider = create_provider_with_fallback()
     try:
-        stocks = provider.get_stock_list_with_names()
-        return jsonify({'code': 0, 'data': [{'code': c, 'name': n} for c, n in stocks]})
-    finally:
-        provider.close()
+        provider = create_provider_with_fallback()
+        try:
+            stocks = provider.get_stock_list_with_names()
+            return jsonify({'code': 0, 'data': [{'code': c, 'name': n} for c, n in stocks]})
+        finally:
+            provider.close()
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取股票列表失败: {str(e)}'})
 
 
 @app.route('/api/stock/daily')
@@ -132,18 +138,22 @@ def scan_progress():
 
         provider = create_provider_with_fallback()
         try:
-            stocks = provider.get_stock_list_with_names()
-            total = len(stocks)
+            all_stocks = provider.get_stock_list_with_names()
+            total_stocks = len(all_stocks)
+            
             if limit_val > 0:
-                stocks = stocks[:limit_val]
+                stocks = all_stocks[:limit_val]
+            else:
+                stocks = all_stocks
 
             matched = []
             count = 0
             last_log_time = time.time()
             log_interval = 0.3
             start_time = time.time()
+            scan_total = len(stocks)
 
-            yield f"event: start\ndata: {{'type':'start','total':{total},'limit':{limit_val}}}\n\n"
+            yield f"event: start\ndata: {{'type':'start','total':{scan_total},'total_stocks':{total_stocks},'limit':{limit_val}}}\n\n"
 
             for code, name in stocks:
                 try:
@@ -175,10 +185,10 @@ def scan_progress():
 
                     current_time = time.time()
                     if current_time - last_log_time >= log_interval:
-                        progress = (count / len(stocks)) * 100 if stocks else 0
+                        progress = (count / scan_total) * 100 if scan_total > 0 else 0
                         elapsed = current_time - start_time
                         speed = count / elapsed if elapsed > 0 else 0
-                        yield f"event: progress\ndata: {{'type':'progress','count':{count},'total':{len(stocks)},'matched':{len(matched)},'progress':{progress:.1f},'code':'{code}','speed':{speed:.1f}}}\n\n"
+                        yield f"event: progress\ndata: {{'type':'progress','count':{count},'total':{scan_total},'matched':{len(matched)},'progress':{progress:.1f},'code':'{code}','speed':{speed:.1f}}}\n\n"
                         last_log_time = current_time
 
                 except Exception as e:
@@ -186,7 +196,7 @@ def scan_progress():
                     continue
 
             elapsed = time.time() - start_time
-            yield f"event: done\ndata: {{'type':'done','count':{count},'total':{len(stocks)},'matched':{len(matched)},'elapsed':{elapsed:.1f}}}\n\n"
+            yield f"event: done\ndata: {{'type':'done','count':{count},'total':{scan_total},'matched':{len(matched)},'elapsed':{elapsed:.1f}}}\n\n"
 
         finally:
             provider.close()

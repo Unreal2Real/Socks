@@ -544,7 +544,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">模式</label>
-          <select class="form-select">
+          <select class="form-select" id="scanMode">
             <option>增量扫描（推荐）</option>
             <option>全量扫描</option>
           </select>
@@ -787,7 +787,8 @@ async function runScan() {
 
             if (data.type === 'start') {
               scanTotal = data.total;
-              addLog('info', `扫描开始，共 ${scanTotal} 只股票`);
+              const fullCount = data.total_stocks || data.total;
+              addLog('info', `全市场 ${fullCount} 只股票，本次扫描 ${data.total} 只`);
               startTime = now;
             } else if (data.type === 'progress') {
               scanCount = data.count;
