@@ -710,31 +710,117 @@ async function runScan() {
   const progress = document.getElementById('scanProgress');
   const logPanel = document.getElementById('scanLog');
 
-  const abort = new AbortController();
-  _scanAbort = abort;
+  _scanAbort = new AbortController();
   btn.disabled = true;
   btnStop.disabled = false;
   btn.textContent = '🔄 扫描中…';
-  status.textContent = '正在扫描…';
   progress.classList.add('indeterminate');
-  logPanel.innerHTML = `<div class="log-line ok">扫描开始，全市场检测中…</div>`;
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">⏳ 扫描中，请稍候…</td></tr>';
+  logPanel.innerHTML = '';
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">⏳ 正在连接扫描服务…</td></tr>';
   document.getElementById('scanStockDetail').style.display = 'none';
 
+  const matchedResults = [];
+  let scanTotal = 0;
+  let scanCount = 0;
+  let matchedCount = 0;
+  let startTime = Date.now();
+  let lastUpdateTime = 0;
+
+  function addLog(type, message) {
+    const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    const className = type === 'error' ? 'err' : (type === 'warn' ? 'warn' : 'ok');
+    logPanel.innerHTML = `<div class="log-line ${className}">[${time}] ${message}</div>` + logPanel.innerHTML;
+    if (logPanel.children.length > 50) {
+      logPanel.removeChild(logPanel.lastChild);
+    }
+  }
+
+  function updateProgress(count, total, matched, currentCode, speed) {
+    if (total > 0) {
+      const pct = (count / total * 100).toFixed(1);
+      progress.classList.remove('indeterminate');
+      progress.style.width = pct + '%';
+      status.textContent = `扫描中 ${count}/${total} 只，已匹配 ${matched} 只，当前: ${currentCode} (${speed}只/秒)`;
+    }
+  }
+
   try {
-    const startTime = Date.now();
-    const json = await apiGet('/api/scan', abort.signal);
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    const limitSelect = document.getElementById('scanMode');
+    const isFullScan = limitSelect && limitSelect.value === '全量扫描';
+    const limit = isFullScan ? 0 : 200;
 
-    if (json.code !== 0) throw new Error(json.msg);
+    addLog('info', `连接扫描服务… (${isFullScan ? '全量' : '增量'}模式)`);
 
-    progress.classList.remove('indeterminate');
-    progress.style.width = '100%';
-    status.textContent = `扫描完成：全市场 ${json.total} 只，发现 ${json.matched_count} 只匹配形态`;
-    logPanel.innerHTML = `<div class="log-line ok">✓ 扫描完成 · ${json.total}只 · ${json.matched_count}匹配 · 耗时 ${elapsed}s</div>`;
+    const response = await fetch(`/api/scan/progress?limit=${limit}`, {
+      signal: _scanAbort.signal,
+      headers: { 'Accept': 'text/event-stream' }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    addLog('info', `已连接，正在扫描…`);
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('event:')) {
+          const eventType = line.slice(6).trim();
+          continue;
+        }
+        if (line.startsWith('data:')) {
+          try {
+            const dataStr = line.slice(5).trim().replace(/'/g, '"');
+            const data = JSON.parse(dataStr);
+            const now = Date.now();
+
+            if (data.type === 'start') {
+              scanTotal = data.total;
+              addLog('info', `扫描开始，共 ${scanTotal} 只股票`);
+              startTime = now;
+            } else if (data.type === 'progress') {
+              scanCount = data.count;
+              matchedCount = data.matched;
+              const elapsed = (now - startTime) / 1000;
+              const speed = data.speed || (scanCount / elapsed);
+              updateProgress(scanCount, scanTotal, matchedCount, data.code, speed.toFixed(1));
+              if (now - lastUpdateTime > 500) {
+                addLog('progress', `已扫描 ${scanCount}/${scanTotal} (${((scanCount/scanTotal)*100).toFixed(1)}%)`);
+                lastUpdateTime = now;
+              }
+            } else if (data.type === 'match') {
+              matchedResults.push({
+                stock_code: data.code,
+                stock_name: data.name,
+                pattern_score: data.score
+              });
+              addLog('match', `✨ 发现匹配: ${data.code} ${data.name} (score: ${data.score.toFixed(2)})`);
+            } else if (data.type === 'done') {
+              const elapsed = ((now - startTime) / 1000).toFixed(1);
+              progress.style.width = '100%';
+              status.textContent = `扫描完成：${data.count} 只，已匹配 ${data.matched} 只`;
+              addLog('success', `✓ 扫描完成! 共扫描 ${data.count} 只，发现 ${data.matched} 个匹配，耗时 ${elapsed}s`);
+            }
+          } catch (e) {
+            // 解析错误，忽略
+          }
+        }
+      }
+    }
+
     tbody.innerHTML = '';
-
-    json.matched.forEach(p => {
+    matchedResults.forEach(p => {
       const tr = document.createElement('tr');
       tr.className = 'clickable-row';
       tr.dataset.code = p.stock_code;
@@ -746,33 +832,36 @@ async function runScan() {
           <span class="score-bar-track"><span class="score-bar-fill" style="width:${(p.pattern_score*100).toFixed(0)}%;background:var(--accent);"></span></span>
           <span class="score-text" style="color:var(--accent);">${p.pattern_score.toFixed(2)}</span>
         </span></td>
-        <td style="color:var(--red);">+${(p.uptrend_gain*100).toFixed(1)}%</td>
-        <td>${p.consolidation_days}天</td>
+        <td>-</td>
+        <td>-</td>
         <td><span class="tag tag-green">已匹配</span></td>`;
-      tr.addEventListener('click', () => openScanDetail(tr.dataset.code, tr.dataset.name, p));
+      tr.addEventListener('click', () => {
+        const pattern = { uptrend_start_date: '-', uptrend_end_date: '-', consolidation_end_date: '-', score: p.pattern_score };
+        openScanDetail(tr.dataset.code, tr.dataset.name, pattern);
+      });
       tbody.appendChild(tr);
     });
 
-    if (json.matched.length === 0) {
+    if (matchedResults.length === 0) {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">未发现匹配形态</td></tr>';
     }
+
   } catch (e) {
     if (e.name === 'AbortError') {
       status.textContent = '扫描已取消';
-      logPanel.innerHTML = `<div class="log-line warn">⏹ 扫描已取消</div>`;
+      addLog('warn', `⏹ 扫描已取消 (已扫描 ${scanCount}/${scanTotal} 只)`);
     } else {
       progress.classList.remove('indeterminate');
       progress.style.width = '0%';
       tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--red);">扫描失败：${e.message}</td></tr>`;
       status.textContent = '扫描失败';
-      logPanel.innerHTML = `<div class="log-line warn">✗ 扫描失败：${e.message}</div>`;
+      addLog('error', `✗ 扫描失败: ${e.message}`);
     }
   } finally {
     btn.disabled = false;
     btnStop.disabled = true;
     btn.textContent = '▶ 开始扫描';
     _scanAbort = null;
-    progress.classList.remove('indeterminate');
   }
 }
 

@@ -1,8 +1,9 @@
 import os
 import sys
 import json
+import time
 from datetime import datetime, timedelta
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -116,10 +117,84 @@ def stock_realtime():
         quote = provider.get_realtime_quote(code)
         if not quote:
             return jsonify({'code': 1, 'msg': '无法获取实时报价'})
-        
+
         return jsonify({'code': 0, 'data': quote})
     finally:
         provider.close()
+
+
+@app.route('/api/scan/progress')
+def scan_progress():
+    def generate():
+        limit = int(request.args.get('limit', 0))
+        config = make_config({})
+
+        provider = create_provider_with_fallback()
+        try:
+            stocks = provider.get_stock_list_with_names()
+            total = len(stocks)
+            if limit > 0:
+                stocks = stocks[:limit]
+
+            matched = []
+            count = 0
+            last_log_time = time.time()
+            log_interval = 0.3
+            start_time = time.time()
+
+            yield f"event: start\ndata: {{'type':'start','total':{total},'limit':{limit}}}\n\n"
+
+            for code, name in stocks:
+                try:
+                    df = provider.get_daily_data(code, days=config.get('min_days', 60))
+                    if df.empty or len(df) < config.get('min_days', 60):
+                        count += 1
+                        continue
+
+                    recognizer = FactoryPatternRecognizer(config)
+                    pattern = recognizer.find_pattern(df)
+
+                    if pattern:
+                        matched.append({
+                            'code': code,
+                            'name': name,
+                            'score': pattern.get('score', 0),
+                            'type': pattern.get('type', ''),
+                            'days': len(df),
+                            'latest_date': df['date'].max().strftime('%Y-%m-%d'),
+                            'uptrend_gain': pattern.get('uptrend_gain', 0),
+                            'consolidation_days': pattern.get('consolidation_days', 0),
+                            'uptrend_start_date': pattern.get('uptrend_start_date', ''),
+                            'uptrend_end_date': pattern.get('uptrend_end_date', ''),
+                            'consolidation_end_date': pattern.get('consolidation_end_date', '')
+                        })
+                        yield f"event: match\ndata: {{'type':'match','code':'{code}','name':'{name}','score':{pattern.get('score', 0)}}}\n\n"
+
+                    count += 1
+
+                    current_time = time.time()
+                    if current_time - last_log_time >= log_interval:
+                        progress = (count / len(stocks)) * 100 if stocks else 0
+                        elapsed = current_time - start_time
+                        speed = count / elapsed if elapsed > 0 else 0
+                        yield f"event: progress\ndata: {{'type':'progress','count':{count},'total':{len(stocks)},'matched':{len(matched)},'progress':{progress:.1f},'code':'{code}','speed':{speed:.1f}}}\n\n"
+                        last_log_time = current_time
+
+                except Exception as e:
+                    count += 1
+                    continue
+
+            elapsed = time.time() - start_time
+            yield f"event: done\ndata: {{'type':'done','count':{count},'total':{len(stocks)},'matched':{len(matched)},'elapsed':{elapsed:.1f}}}\n\n"
+
+        finally:
+            provider.close()
+
+    return Response(generate(), mimetype='text/event-stream', headers={
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no'
+    })
 
 
 @app.route('/api/scan', methods=['GET', 'POST'])
@@ -135,42 +210,47 @@ def scan():
         config_overrides = {}
 
     config = make_config(config_overrides)
-    
+
     provider = create_provider_with_fallback()
     try:
         stocks = provider.get_stock_list_with_names()
         if limit > 0:
             stocks = stocks[:limit]
-        
+
         results = []
         count = 0
-        
+
         for code, name in stocks:
             if count >= batch_size and batch_size > 0:
                 break
-            
+
             try:
                 df = provider.get_daily_data(code, days=config.get('min_days', 60))
                 if df.empty or len(df) < config.get('min_days', 60):
                     continue
-                
-                recognizer = FactoryPatternRecognizer(df, config)
-                pattern = recognizer.recognize()
-                
-                if pattern['matched']:
+
+                recognizer = FactoryPatternRecognizer(config)
+                pattern = recognizer.find_pattern(df)
+
+                if pattern:
                     results.append({
                         'code': code,
                         'name': name,
-                        'score': pattern['score'],
-                        'type': pattern['type'],
+                        'score': pattern.get('score', 0),
+                        'type': pattern.get('type', ''),
                         'days': len(df),
-                        'latest_date': df['date'].max().strftime('%Y-%m-%d')
+                        'latest_date': df['date'].max().strftime('%Y-%m-%d'),
+                        'uptrend_gain': pattern.get('uptrend_gain', 0),
+                        'consolidation_days': pattern.get('consolidation_days', 0),
+                        'uptrend_start_date': pattern.get('uptrend_start_date', ''),
+                        'uptrend_end_date': pattern.get('uptrend_end_date', ''),
+                        'consolidation_end_date': pattern.get('consolidation_end_date', '')
                     })
             except Exception as e:
                 pass
-            
+
             count += 1
-        
+
         return jsonify({
             'code': 0,
             'data': results,
@@ -283,7 +363,7 @@ def cache_stats():
 def cache_clear():
     data = request.get_json() or {}
     stock_code = data.get('code', None)
-    
+
     provider = create_provider_with_fallback()
     try:
         provider.clear_cache(stock_code)
