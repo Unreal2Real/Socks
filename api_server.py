@@ -192,25 +192,18 @@ def stock_pattern():
 
 @app.route('/api/scan')
 def scan():
-    from data.scan_state import ScanState
-    from multiprocessing import Pool
+    from multiprocessing.pool import ThreadPool
 
     fetcher = DataFetcher()
-    try:
-        all_stocks = fetcher.get_stock_list_with_names()
-    finally:
-        fetcher.close()
-
-    BATCH_SIZE = 80
+    all_stocks = fetcher.get_stock_list_with_names()
+    # 保持 fetcher 登录状态，各线程共享使用
 
     def process_one(item):
         code, name = item
         if 'ST' in name or '*ST' in name:
             return {'code': code, 'name': name, 'status': 'no_pattern', 'score': 0, 'notes': 'ST'}, None
         try:
-            f = DataFetcher()
-            df = f.get_daily_data(code, days=TRADING_CONFIG['data_days'])
-            f.close()
+            df = fetcher.get_daily_data(code, days=TRADING_CONFIG['data_days'])
             if len(df) < 60:
                 return {'code': code, 'name': name, 'status': 'no_pattern', 'score': 0, 'notes': '数据不足'}, None
 
@@ -246,11 +239,14 @@ def scan():
     updates = []
     total = len(all_stocks)
 
-    with Pool(processes=3) as pool:
-        for r, pat in pool.imap(process_one, all_stocks):
-            updates.append(r)
-            if pat:
-                matched.append(pat)
+    try:
+        with ThreadPool(processes=3) as pool:
+            for r, pat in pool.imap(process_one, all_stocks):
+                updates.append(r)
+                if pat:
+                    matched.append(pat)
+    finally:
+        fetcher.close()
 
     return jsonify({
         'code': 0,

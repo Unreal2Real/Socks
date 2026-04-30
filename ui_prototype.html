@@ -407,9 +407,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
         <div class="form-group" style="max-width:240px;">
           <label class="form-label">从扫描结果选</label>
           <select class="form-select" id="stockSelect">
-            <option value="603135">603135 中重科技</option>
-            <option value="301439">301439 泓淋电力</option>
-            <option value="600831">600831 广电网络</option>
+            <option value="">加载中…</option>
           </select>
         </div>
         <button class="btn btn-primary" id="btnAnalyze">▶ 分析</button>
@@ -429,15 +427,15 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
 
   <div class="quick-stats">
     <div class="stat">
-      <div class="n" style="color:var(--accent);">3</div>
+      <div class="n" style="color:var(--accent);" id="statMatchCount">-</div>
       <div class="l">历史匹配次数</div>
     </div>
     <div class="stat">
-      <div class="n" style="color:var(--green);">0.82</div>
+      <div class="n" style="color:var(--green);" id="statAvgScore">-</div>
       <div class="l">平均评分</div>
     </div>
     <div class="stat">
-      <div class="n" style="color:var(--orange);">16</div>
+      <div class="n" style="color:var(--orange);" id="statAvgConsolidation">-</div>
       <div class="l">平均盘整天</div>
     </div>
   </div>
@@ -504,50 +502,7 @@ tbody td code { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 11p
       <span style="font-size:11px;color:var(--text-secondary);">点击阶段可在上图定位</span>
     </div>
     <div class="card-body">
-      <div class="timeline" id="timeline">
-        <div class="timeline-item active" data-phase="0">
-          <div class="row">
-            <div class="left">
-              <div class="date">2026-02-10（最新）</div>
-              <div class="phase-range">↑ 2025-11-04 → 2026-01-15　▬ 2026-01-16 → 2026-02-10</div>
-              <div class="meta">
-                <span class="tag tag-red">↑ +15.4%</span>
-                <span class="tag tag-blue">盘整14天</span>
-                <span class="tag tag-green">score 0.85</span>
-              </div>
-            </div>
-            <span class="tag tag-gray">已匹配</span>
-          </div>
-        </div>
-        <div class="timeline-item" data-phase="1">
-          <div class="row">
-            <div class="left">
-              <div class="date">2025-09-03</div>
-              <div class="phase-range">↑ 2025-06-15 → 2025-09-03　▬ 2025-09-04 → 2025-09-16</div>
-              <div class="meta">
-                <span class="tag tag-red">↑ +15.3%</span>
-                <span class="tag tag-blue">盘整13天</span>
-                <span class="tag tag-green">score 0.82</span>
-              </div>
-            </div>
-            <span class="tag tag-gray">已匹配</span>
-          </div>
-        </div>
-        <div class="timeline-item" data-phase="2">
-          <div class="row">
-            <div class="left">
-              <div class="date">2025-08-12</div>
-              <div class="phase-range">↑ 2025-06-20 → 2025-08-12　▬ 2025-08-13 → 2025-08-31</div>
-              <div class="meta">
-                <span class="tag tag-red">↑ +18.5%</span>
-                <span class="tag tag-blue">盘整19天</span>
-                <span class="tag tag-green">score 0.78</span>
-              </div>
-            </div>
-            <span class="tag tag-gray">已匹配</span>
-          </div>
-        </div>
-      </div>
+      <div class="timeline" id="timelineList"></div>
     </div>
   </div>
 </section>
@@ -893,7 +848,7 @@ async function loadMainChart(code) {
       layout: { background: { type: 'solid', color: '#fff' }, textColor: '#86868B', fontSize: 11 },
       grid: { vertLines: { color: 'rgba(0,0,0,0.05)' }, horzLines: { color: 'rgba(0,0,0,0.05)' } },
       crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-      timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: false, secondsVisible: false },
+      timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: true, secondsVisible: false },
       rightPriceScale: { borderColor: 'rgba(0,0,0,0.06)' },
     });
 
@@ -926,6 +881,17 @@ async function loadMainChart(code) {
       });
 
       updateTimeline(phases);
+
+      // 更新统计数据
+      document.getElementById('statMatchCount').textContent = phases.length;
+      const avgScore = phases.reduce((s, p) => s + p.pattern_score, 0) / phases.length;
+      document.getElementById('statAvgScore').textContent = avgScore.toFixed(2);
+      const avgConsol = phases.reduce((s, p) => s + p.consolidation_days, 0) / phases.length;
+      document.getElementById('statAvgConsolidation').textContent = Math.round(avgConsol);
+    } else {
+      document.getElementById('statMatchCount').textContent = '0';
+      document.getElementById('statAvgScore').textContent = '-';
+      document.getElementById('statAvgConsolidation').textContent = '-';
     }
 
     document.querySelectorAll('.range-btn').forEach(b => { b.classList.remove('active'); if (b.dataset.range === '1y') b.classList.add('active'); });
@@ -1012,7 +978,7 @@ async function loadScanChart(code, mode) {
         width: container.clientWidth, height: 280,
         layout: { background: { type: 'solid', color: '#fff' }, textColor: '#86868B', fontSize: 11 },
         grid: { vertLines: { color: 'rgba(0,0,0,0.05)' }, horzLines: { color: 'rgba(0,0,0,0.05)' } },
-        timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: false, secondsVisible: false },
+        timeScale: { borderColor: 'rgba(0,0,0,0.06)', timeVisible: true, secondsVisible: false },
         rightPriceScale: { borderColor: 'rgba(0,0,0,0.06)' },
       });
       const candle = scanChart.addCandlestickSeries({ upColor: '#FF453A', downColor: '#30D158', borderUpColor: '#FF453A', borderDownColor: '#30D158', wickUpColor: '#FF453A', wickDownColor: '#30D158' });
