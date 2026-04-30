@@ -244,7 +244,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
-  python3 main.py scan                  # 增量扫描（使用默认数据源）
+  python3 main.py scan                  # 增量扫描（默认使用混合数据源）
+  python3 main.py scan --source hybrid   # 混合模式（优先本地，备用API）
   python3 main.py scan --source baostock # 使用 Baostock API
   python3 main.py scan --source tdx     # 使用本地通达信数据
   python3 main.py scan --full            # 全量扫描
@@ -266,8 +267,8 @@ def main():
     p_scan.add_argument('--limit', type=int, default=None, help='限制扫描数量')
     p_scan.add_argument('--workers', type=int, default=3, help='并行进程数')
     p_scan.add_argument('--output', default='results', help='输出目录')
-    p_scan.add_argument('--source', default='baostock', choices=['baostock', 'tdx'],
-                        help='数据源类型: baostock(默认) 或 tdx(本地)')
+    p_scan.add_argument('--source', default='hybrid', choices=['hybrid', 'baostock', 'tdx'],
+                        help='数据源类型: hybrid(混合模式，默认)、baostock(API)、tdx(本地)')
 
     p_bt = subparsers.add_parser('backtest', help='历史回测')
     p_bt.add_argument('--start', default=None, help='起始日期 (YYYY-MM-DD)')

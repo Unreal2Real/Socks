@@ -1,6 +1,6 @@
 DATA_SOURCE_CONFIG = {
-    'default': 'baostock',
-    'tdx_path': 'C:/zd_zsone/T0002/hq_cache',
+    'default': 'hybrid',
+    'tdx_path': 'C:/zd_zsone',
     'fallback_enabled': True,
 }
 
