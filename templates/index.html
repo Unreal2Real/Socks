@@ -79,6 +79,12 @@ tr.unviewed td:first-child{font-weight:700}
 #correctBanner .step.active{background:var(--orange);color:#000}
 #correctBanner .step.done{background:rgba(34,197,94,.15);color:var(--green)}
 #correctBanner .hint{font-size:11px;color:var(--dim);margin-top:4px}
+#choiceDialog{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;z-index:1100;width:380px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+#choiceDialog.active{display:block}
+#choiceDialog p{font-size:14px;margin-bottom:16px;color:var(--text);line-height:1.6}
+#choiceDialog .btns{display:flex;gap:10px;justify-content:center}
+#choiceOverlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:1099}
+#choiceOverlay.active{display:block}
 </style>
 </head>
 <body>
@@ -135,6 +141,15 @@ tr.unviewed td:first-child{font-weight:700}
   <div class="row" style="margin-top:12px">
     <button class="btn-primary" onclick="submitCorrection()">提交纠正</button>
     <button onclick="closeMLPanel()">取消</button>
+  </div>
+</div>
+
+<div id="choiceOverlay" class="choice-backdrop"></div>
+<div id="choiceDialog">
+  <p id="choiceMsg"></p>
+  <div class="btns">
+    <button class="btn-primary" id="choiceBtn1">修改</button>
+    <button id="choiceBtn2">完全不符</button>
   </div>
 </div>
 
@@ -467,8 +482,17 @@ async function labelGood(code, name) {
 }
 
 async function labelBad(code, name) {
-  var choice = confirm('这个形态有问题：\n\n点"确定" → 在K线上纠正日期\n点"取消" → 标记为完全不符');
-  if (!choice) {
+  correctCode = code;
+  correctName = name;
+  document.getElementById('choiceMsg').textContent = name+' ('+code+')\n\n该形态有问题，请选择：';
+  document.getElementById('choiceBtn1').textContent = '修改';
+  document.getElementById('choiceBtn1').onclick = function(){
+    closeChoiceDialog();
+    startCorrectMode(code, name);
+  };
+  document.getElementById('choiceBtn2').textContent = '完全不符';
+  document.getElementById('choiceBtn2').onclick = async function(){
+    closeChoiceDialog();
     var data = await loadMLFeatures(code);
     var r = await fetch('/api/ml/label', {
       method: 'POST',
@@ -485,8 +509,17 @@ async function labelBad(code, name) {
       updateMLStats(j);
       showResults(scanResultsStore);
     }
-    return;
-  }
+  };
+  document.getElementById('choiceDialog').classList.add('active');
+  document.getElementById('choiceOverlay').classList.add('active');
+}
+
+function closeChoiceDialog() {
+  document.getElementById('choiceDialog').classList.remove('active');
+  document.getElementById('choiceOverlay').classList.remove('active');
+}
+
+async function startCorrectMode(code, name) {
 
   cancelCorrect();
   correctCode = code;
