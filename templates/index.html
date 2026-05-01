@@ -12,6 +12,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   background:var(--bg);color:var(--text);padding:16px}
 h2{font-size:16px;margin-bottom:12px;color:#fff}
 .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px}
+.card-sticky{position:sticky;top:0;z-index:100;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.5)}
 .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 input,select,button{padding:8px 12px;border-radius:6px;border:1px solid var(--border);
   background:var(--bg);color:var(--text);font-size:14px}
@@ -41,7 +42,11 @@ button:hover{opacity:.9}
 .ml-model-ready{color:var(--green)}
 .ml-corrected{color:var(--orange)}
 input{width:120px}
-#kline-chart{width:100%;height:400px}
+#kline-placeholder{width:100%;height:100px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--border);border-radius:6px;color:var(--dim);font-size:13px;cursor:pointer}
+#kline-placeholder:hover{border-color:var(--accent);color:var(--accent)}
+#kline-chart{width:100%;height:400px;display:none}
+#currentStock{font-size:14px;font-weight:600;margin-left:8px;color:var(--text)}
+#currentStock .name{color:var(--accent)}
 .progress-wrap{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:8px 0}
 .progress-bar{height:100%;background:var(--accent);width:0;transition:width .3s}
 .log{max-height:200px;overflow-y:auto;font-size:12px;font-family:monospace;line-height:1.6}
@@ -64,17 +69,23 @@ tr{cursor:pointer}
 .text-green{color:var(--green)}
 .text-dim{color:var(--dim)}
 .status{font-size:13px;color:var(--dim);margin:4px 0}
+tr.unviewed{background:rgba(59,130,246,.12)}
+tr.unviewed:hover{background:rgba(59,130,246,.2)}
+tr.unviewed td:first-child{font-weight:700}
+.new-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:6px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 </style>
 </head>
 <body>
 
-<div class="card">
+<div class="card-sticky">
   <h2>📈 个股分析</h2>
   <div class="row">
     <input id="stockCode" type="text" placeholder="股票代码" value="600519">
     <button class="btn-primary" onclick="analyzeStock()">分析</button>
-    <span id="stockName" style="font-weight:600"></span>
+    <span id="currentStock"></span>
   </div>
+  <div id="kline-placeholder" onclick="document.getElementById('stockCode').focus()">👆 输入代码或点击下方股票查看K线图</div>
   <div id="kline-chart"></div>
   <div id="patternDetail" class="pattern-info" style="display:none"></div>
 </div>
@@ -117,6 +128,7 @@ tr{cursor:pointer}
 <script>
 let chart = null, candleSeries = null, volumeSeries = null, lineSeries = {};
 let scanTimer = null;
+let viewedStocks = new Set();
 
 function createChart() {
   const el = document.getElementById('kline-chart');
@@ -164,8 +176,15 @@ async function analyzeStock() {
     const r = await fetch(`/api/stock/${code}?days=500`);
     const j = await r.json();
     if (j.code !== 0) return alert(j.msg);
+    document.getElementById('kline-placeholder').style.display = 'none';
+    document.getElementById('kline-chart').style.display = 'block';
     renderKline(j.data, j.pattern);
     renderPattern(j.pattern);
+    var cs = document.getElementById('currentStock');
+    if (!cs.innerHTML || cs.innerHTML.indexOf(code) === -1) {
+      cs.innerHTML = '<code>'+code+'</code>';
+    }
+    document.getElementById('stockCode').value = code;
   } catch(e) { alert('加载失败: '+e.message); }
 }
 
@@ -271,11 +290,13 @@ async function pollProgress() {
     document.getElementById('scanStatus').innerText = d.running
       ? `扫描中 ${d.progress}/${d.total} (${d.percent}%) | 已匹配 ${d.matched} | 当前: ${d.current}`
       : `已完成 ${d.progress}/${d.total} | 匹配 ${d.matched} 只`;
-    if (d.matched > 0 && !d.running) {
+
+    if (d.matched > 0) {
       const rr = await fetch('/api/scan/results');
       const rj = await rr.json();
       showResults(rj.data);
     }
+
     if (!d.running) { stopPolling(); resetScanBtn(); addLog('ok', d.progress>0 ? `扫描完成！共 ${d.total} 只，匹配 ${d.matched} 只` : '扫描结束');
       loadLastScan();
     }
@@ -289,21 +310,26 @@ function showResults(results) {
   const statusLabel = {new:'🆕 新增', kept:'✅ 保持', changed:'📈 变化', exited:'🚫 退出'};
   const statusTag = {new:'tag-green', kept:'tag-blue', changed:'tag-orange', exited:'tag-gray'};
 
-  let html = '<table><thead><tr><th>代码</th><th>名称</th><th>评分</th><th>涨幅</th><th>盘整</th><th>状态</th><th>日期</th><th>ML</th></tr></thead><tbody>';
+  let html = '<table><thead><tr><th></th><th>代码</th><th>名称</th><th>评分</th><th>涨幅</th><th>盘整</th><th>状态</th><th>日期</th><th>ML</th></tr></thead><tbody>';
   results.forEach(p => {
     const st = p.status || 'new';
     const fid = p.stock_code;
-    html += `<tr id="row-${fid}"${st==='exited'?' style="opacity:.5"':''}>
-      <td><code onclick="viewStock('${fid}')">${fid}</code></td><td>${p.stock_name}</td>
-      <td><span class="tag tag-green">${p.pattern_score.toFixed(2)}</span></td>
-      <td class="text-green">+${(p.uptrend_gain*100).toFixed(1)}%</td>
-      <td>${p.consolidation_days}天</td>
-      <td><span class="tag ${statusTag[st]||'tag-gray'}">${statusLabel[st]||st}</span></td>
-      <td>${p.consolidation_end_date}</td>
-      <td id="ml-${fid}">
-        <button class="btn-ml btn-accept" onclick="labelGood('${fid}','${p.stock_name.replace(/'/g,"\\'")}')" title="形态正确">✅</button>
-        <button class="btn-ml btn-reject" onclick="labelBad('${fid}','${p.stock_name.replace(/'/g,"\\'")}')" title="形态不对">❌</button>
-      </td></tr>`;
+    const isNew = !viewedStocks.has(fid);
+    const rowClass = (st==='exited'?' style=\"opacity:.5\"':'') + (isNew?' class=\"unviewed\"':'');
+    const dot = isNew ? '<span class=\"new-dot\"></span>' : '';
+    html += '<tr id=\"row-'+fid+'\"'+rowClass+'>'
+      + '<td onclick=\"viewStock(\''+fid+'\',\''+p.stock_name.replace(/'/g,'\\\'')+'\')\">'+dot+'</td>'
+      + '<td><code onclick=\"viewStock(\''+fid+'\',\''+p.stock_name.replace(/'/g,'\\\'')+'\')\">'+fid+'</code></td>'
+      + '<td>'+p.stock_name+'</td>'
+      + '<td><span class=\"tag tag-green\">'+p.pattern_score.toFixed(2)+'</span></td>'
+      + '<td class=\"text-green\">+'+(p.uptrend_gain*100).toFixed(1)+'%</td>'
+      + '<td>'+p.consolidation_days+'天</td>'
+      + '<td><span class=\"tag '+(statusTag[st]||'tag-gray')+'\">'+(statusLabel[st]||st)+'</span></td>'
+      + '<td>'+p.consolidation_end_date+'</td>'
+      + '<td id=\"ml-'+fid+'\">'
+      + '<button class=\"btn-ml btn-accept\" onclick=\"labelGood(\''+fid+'\',\''+p.stock_name.replace(/'/g,'\\\'')+'\')\" title=\"形态正确\">✅</button> '
+      + '<button class=\"btn-ml btn-reject\" onclick=\"labelBad(\''+fid+'\',\''+p.stock_name.replace(/'/g,'\\\'')+'\')\" title=\"形态不对\">❌</button>'
+      + '</td></tr>';
   });
   html += '</tbody></table>';
   el.innerHTML = html;
@@ -331,8 +357,12 @@ async function loadLastScan() {
 
 window.addEventListener('DOMContentLoaded', loadLastScan);
 
-function viewStock(code) {
+function viewStock(code, name) {
   document.getElementById('stockCode').value = code;
+  document.getElementById('currentStock').innerHTML = '<code>'+code+'</code> <span class="name">'+(name||'')+'</span>';
+  viewedStocks.add(code);
+  var row = document.getElementById('row-'+code);
+  if (row) { row.classList.remove('unviewed'); var td = row.querySelector('td'); if (td) td.innerHTML = ''; }
   analyzeStock();
   window.scrollTo({top:0,behavior:'smooth'});
 }
