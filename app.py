@@ -8,6 +8,7 @@ from data.fetcher import DataFetcher
 from pattern.recognizer import PatternRecognizer
 from scanner.engine import ScanEngine
 from _config import FACTORY_PATTERN, SCAN
+from ml import labels, trainer, features as ml_features
 
 app = Flask(__name__, template_folder='templates', static_folder='.')
 
@@ -99,6 +100,90 @@ def api_scan_stop():
 @app.route('/api/cache/stats')
 def api_cache_stats():
     return jsonify({'code': 0, 'data': fetcher.cache_stats()})
+
+
+@app.route('/api/ml/label', methods=['POST'])
+def api_ml_label():
+    body = request.get_json(force=True, silent=True) or {}
+    stock_code = body.get('stock_code', '')
+    stock_name = body.get('stock_name', '')
+    lbl = body.get('label', '')
+    correct_start = body.get('correct_start', '')
+    correct_peak = body.get('correct_peak', '')
+    correct_end = body.get('correct_end', '')
+
+    if lbl not in ('good', 'bad'):
+        return jsonify({'code': 1, 'msg': 'label must be good or bad'})
+
+    if not stock_code:
+        return jsonify({'code': 1, 'msg': 'stock_code required'})
+
+    feat = body.get('features') or {}
+    record = {
+        'stock_code': stock_code,
+        'stock_name': stock_name,
+        'label': lbl,
+        'correct_start': correct_start,
+        'correct_peak': correct_peak,
+        'correct_end': correct_end,
+        'features': feat,
+    }
+
+    labels.save_label(record)
+
+    all_labels = labels.load_labels()
+    _, metrics = trainer.train_from_labels(all_labels)
+    stats = labels.get_stats()
+
+    return jsonify({'code': 0, 'stats': stats, 'metrics': metrics})
+
+
+@app.route('/api/ml/stats')
+def api_ml_stats():
+    return jsonify({
+        'code': 0,
+        'labels': labels.get_stats(),
+        'model': trainer.get_model_info(),
+    })
+
+
+@app.route('/api/ml/predict', methods=['POST'])
+def api_ml_predict():
+    body = request.get_json(force=True, silent=True) or {}
+    feat = body.get('features') or {}
+    if not feat:
+        return jsonify({'code': 1, 'msg': 'features required'})
+
+    prob = trainer.predict(feat)
+    return jsonify({'code': 0, 'probability': prob})
+
+
+@app.route('/api/ml/features/<code>')
+def api_ml_features(code):
+    df = fetcher.daily_data(code, days=500)
+    if df.empty:
+        return jsonify({'code': 1, 'msg': 'no data'})
+
+    from indicators.technical import TechnicalIndicators
+    df = TechnicalIndicators.calculate_all(df.ffill().bfill())
+    pattern = recognizer.find_pattern(df, max_days_back=SCAN.get('max_days_back'))
+
+    if not pattern:
+        return jsonify({'code': 0, 'pattern': None, 'features': None})
+
+    feat = ml_features.extract_features(
+        df, pattern['uptrend_start_idx'],
+        pattern['uptrend_end_idx'],
+        pattern['consolidation_end_idx']
+    )
+    ml_prob = trainer.predict(feat)
+
+    return jsonify({
+        'code': 0,
+        'pattern': pattern,
+        'features': feat,
+        'ml_probability': ml_prob,
+    })
 
 
 if __name__ == '__main__':

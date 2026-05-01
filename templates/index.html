@@ -20,7 +20,24 @@ button:hover{opacity:.9}
 .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .btn-success{background:var(--green);color:#fff;border-color:var(--green)}
 .btn-danger{background:var(--red);color:#fff;border-color:var(--red)}
-.btn-sm{padding:4px 10px;font-size:12px}
+.btn-sm{padding:4px 10px;font-size:12px;border-radius:4px}
+.btn-accept{background:rgba(34,197,94,.2);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+.btn-accept:hover{background:rgba(34,197,94,.35)}
+.btn-reject{background:rgba(239,68,68,.2);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.btn-reject:hover{background:rgba(239,68,68,.35)}
+.btn-ml{padding:2px 6px;font-size:10px}
+.ml-panel{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;
+  z-index:1000;width:420px;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.ml-panel.active{display:block}
+.ml-panel h3{font-size:14px;margin-bottom:12px;color:#fff}
+.ml-panel input{width:100%;margin-bottom:8px}
+.ml-panel label{display:block;font-size:11px;color:var(--dim);margin-bottom:2px}
+.ml-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,.6);z-index:999}
+.ml-overlay.active{display:block}
+.ml-stats{font-size:11px;color:var(--dim);margin-bottom:8px;display:flex;gap:16px}
+.ml-stats strong{color:var(--text)}
 input{width:120px}
 #kline-chart{width:100%;height:400px}
 .progress-wrap{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:8px 0}
@@ -73,6 +90,23 @@ tr{cursor:pointer}
   <div class="progress-wrap"><div class="progress-bar" id="scanProgress"></div></div>
   <div id="scanLog" class="log"></div>
   <div id="scanResults" style="margin-top:12px"></div>
+  <div id="mlStats" class="ml-stats" style="display:none"></div>
+</div>
+
+<div class="ml-overlay" id="mlOverlay" onclick="closeMLPanel()"></div>
+<div class="ml-panel" id="mlPanel">
+  <h3>🔧 纠正形态 (告诉模型什么样是对的)</h3>
+  <p style="font-size:12px;color:var(--dim);margin-bottom:12px" id="mlPanelCode"></p>
+  <label>正确的上涨起点</label>
+  <input id="mlCorrectStart" type="text" placeholder="YYYY-MM-DD">
+  <label>正确的盘整开始(峰顶)</label>
+  <input id="mlCorrectPeak" type="text" placeholder="YYYY-MM-DD">
+  <label>正确的盘整结束</label>
+  <input id="mlCorrectEnd" type="text" placeholder="YYYY-MM-DD">
+  <div class="row" style="margin-top:12px">
+    <button class="btn-primary" onclick="submitCorrection()">提交纠正</button>
+    <button onclick="closeMLPanel()">取消</button>
+  </div>
 </div>
 
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
@@ -251,19 +285,26 @@ function showResults(results) {
   const statusLabel = {new:'🆕 新增', kept:'✅ 保持', changed:'📈 变化', exited:'🚫 退出'};
   const statusTag = {new:'tag-green', kept:'tag-blue', changed:'tag-orange', exited:'tag-gray'};
 
-  let html = '<table><thead><tr><th>代码</th><th>名称</th><th>评分</th><th>涨幅</th><th>盘整</th><th>状态</th><th>日期</th></tr></thead><tbody>';
+  let html = '<table><thead><tr><th>代码</th><th>名称</th><th>评分</th><th>涨幅</th><th>盘整</th><th>状态</th><th>日期</th><th>ML</th></tr></thead><tbody>';
   results.forEach(p => {
     const st = p.status || 'new';
-    html += `<tr onclick="viewStock('${p.stock_code}')"${st==='exited'?' style="opacity:.5"':''}>
-      <td><code>${p.stock_code}</code></td><td>${p.stock_name}</td>
+    const fid = p.stock_code;
+    html += `<tr id="row-${fid}"${st==='exited'?' style="opacity:.5"':''}>
+      <td><code onclick="viewStock('${fid}')">${fid}</code></td><td>${p.stock_name}</td>
       <td><span class="tag tag-green">${p.pattern_score.toFixed(2)}</span></td>
       <td style="color:var(--green)">+${(p.uptrend_gain*100).toFixed(1)}%</td>
       <td>${p.consolidation_days}天</td>
       <td><span class="tag ${statusTag[st]||'tag-gray'}">${statusLabel[st]||st}</span></td>
-      <td>${p.consolidation_end_date}</td></tr>`;
+      <td>${p.consolidation_end_date}</td>
+      <td id="ml-${fid}">
+        <button class="btn-ml btn-accept" onclick="labelGood('${fid}','${p.stock_name.replace(/'/g,"\\'")}')" title="形态正确">✅</button>
+        <button class="btn-ml btn-reject" onclick="labelBad('${fid}','${p.stock_name.replace(/'/g,"\\'")}')" title="形态不对">❌</button>
+      </td></tr>`;
   });
   html += '</tbody></table>';
   el.innerHTML = html;
+
+  loadMLStats();
 }
 
 async function loadLastScan() {
@@ -301,6 +342,103 @@ function stopScan() {
 
 function stopPolling() { if (scanTimer) { clearInterval(scanTimer); scanTimer = null; } }
 function resetScanBtn() { document.getElementById('btnStart').disabled=false; document.getElementById('btnStop').disabled=true; }
+
+let mlFeatures = {};
+let mlCurrentCode = '';
+
+async function loadMLFeatures(code) {
+  if (mlFeatures[code]) return mlFeatures[code];
+  try {
+    const r = await fetch(`/api/ml/features/${code}`);
+    const j = await r.json();
+    if (j.code === 0 && j.features) {
+      mlFeatures[code] = {features: j.features, pattern: j.pattern, ml_prob: j.ml_probability};
+      return mlFeatures[code];
+    }
+  } catch(e) {}
+  return null;
+}
+
+async function labelGood(code, name) {
+  const data = await loadMLFeatures(code);
+  if (!data) return alert('无法加载特征数据');
+  const r = await fetch('/api/ml/label', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      stock_code: code, stock_name: name, label: 'good',
+      features: data.features,
+    }),
+  });
+  const j = await r.json();
+  if (j.code === 0) {
+    document.getElementById(`ml-${code}`).innerHTML = '<span style="color:var(--green);font-size:11px">✓ 已标注</span>';
+    updateMLStats(j);
+  }
+}
+
+function labelBad(code, name) {
+  mlCurrentCode = code;
+  document.getElementById('mlPanelCode').textContent = `${code} ${name}`;
+  document.getElementById('mlCorrectStart').value = '';
+  document.getElementById('mlCorrectPeak').value = '';
+  document.getElementById('mlCorrectEnd').value = '';
+  document.getElementById('mlPanel').classList.add('active');
+  document.getElementById('mlOverlay').classList.add('active');
+}
+
+function closeMLPanel() {
+  document.getElementById('mlPanel').classList.remove('active');
+  document.getElementById('mlOverlay').classList.remove('active');
+}
+
+async function submitCorrection() {
+  const code = mlCurrentCode;
+  const start = document.getElementById('mlCorrectStart').value.trim();
+  const peak = document.getElementById('mlCorrectPeak').value.trim();
+  const end = document.getElementById('mlCorrectEnd').value.trim();
+
+  const data = await loadMLFeatures(code);
+  if (!data) return alert('无法加载特征数据');
+
+  const r = await fetch('/api/ml/label', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      stock_code: code, stock_name: data.pattern?.stock_name || '',
+      label: 'bad', correct_start: start, correct_peak: peak, correct_end: end,
+      features: data.features,
+    }),
+  });
+  const j = await r.json();
+  closeMLPanel();
+  if (j.code === 0) {
+    document.getElementById(`ml-${code}`).innerHTML = '<span style="color:var(--orange);font-size:11px">✗ 已纠正</span>';
+    updateMLStats(j);
+  }
+}
+
+function updateMLStats(j) {
+  const el = document.getElementById('mlStats');
+  const s = j.stats || {};
+  const m = j.metrics || {};
+  el.style.display = '';
+  el.innerHTML = `ML标注: <strong>${s.total||0}条</strong> (✅${s.good||0} ❌${s.bad||0}) ${m.train_accuracy ? '| 训练准确率: <strong>'+(m.train_accuracy*100).toFixed(0)+'%</strong>' : ''} ${s.total >= 5 ? '| 模型: <strong style=\\'color:var(--green)\\'>已就绪</strong>' : '| 还需 <strong>'+(5-(s.total||0))+'</strong> 条标注'}`;
+}
+
+async function loadMLStats() {
+  try {
+    const r = await fetch('/api/ml/stats');
+    const j = await r.json();
+    if (j.code === 0) {
+      const m = j.model || {};
+      const l = j.labels || {};
+      const el = document.getElementById('mlStats');
+      el.style.display = '';
+      el.innerHTML = `ML标注: <strong>${l.total||0}条</strong> (✅${l.good||0} ❌${l.bad||0}) ${l.total >= 5 ? '| 模型: <strong style=\\'color:var(--green)\\'>已就绪</strong>' : '| 还需 <strong>'+(5-(l.total||0))+'</strong> 条标注可训练模型'}`;
+    }
+  } catch(e) {}
+}
 
 createChart();
 </script>

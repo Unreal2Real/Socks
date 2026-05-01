@@ -38,6 +38,8 @@ class PatternRecognizer:
         if not results:
             return None
 
+        results = self._apply_ml_scoring(df, results)
+
         best = max(results, key=lambda r: r['pattern_score'])
         return best
 
@@ -251,3 +253,29 @@ class PatternRecognizer:
             'pattern_score': round(gain, 2),
             'type': 'factory',
         }
+
+    def _apply_ml_scoring(self, df, results):
+        try:
+            from ml.trainer import predict
+            from ml.features import extract_features
+        except ImportError:
+            return results
+
+        for r in results:
+            si = r.get('uptrend_start_idx')
+            pi = r.get('uptrend_end_idx')
+            ei = r.get('consolidation_end_idx')
+            if si is None or pi is None or ei is None:
+                continue
+
+            try:
+                feat = extract_features(df, si, pi, ei)
+                ml_prob = predict(feat)
+                if ml_prob is not None:
+                    r['ml_score'] = ml_prob
+                    rule_score = r.get('pattern_score', 0.5)
+                    r['pattern_score'] = round(rule_score * 0.5 + ml_prob * 0.5, 4)
+            except Exception:
+                pass
+
+        return results
