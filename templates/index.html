@@ -237,11 +237,24 @@ async function analyzeStock() {
     document.getElementById('kline-placeholder').style.display = 'none';
     document.getElementById('kline-chart').style.display = 'block';
     if (chart) { chart.remove(); chart = null; }
+
+    var corr = labeledStocks[code];
+    if (corr && corr.start && corr.start !== '') {
+      if (j.pattern) {
+        j.pattern.uptrend_start_date = corr.start;
+        j.pattern.uptrend_end_date = corr.peak;
+        j.pattern.consolidation_start_date = corr.peak;
+        j.pattern.consolidation_end_date = corr.end;
+        j.pattern.corrected = true;
+      }
+    }
+
     renderKline(j.data, j.pattern);
     renderPattern(j.pattern);
     var cs = document.getElementById('currentStock');
+    var corrTag = (corr && corr.start && corr.start !== '') ? ' <span style=\"color:var(--orange);font-size:11px\">(已纠正)</span>' : '';
     if (!cs.innerHTML || cs.innerHTML.indexOf(code) === -1) {
-      cs.innerHTML = '<code>'+code+'</code>';
+      cs.innerHTML = '<code>'+code+'</code>'+corrTag;
     }
     document.getElementById('stockCode').value = code;
   } catch(e) { alert('加载失败: '+e.message); }
@@ -259,31 +272,32 @@ function renderKline(data, pattern) {
   volumeSeries.setData(volumes);
 
   const markers = [];
+  const corrected = pattern && pattern.corrected;
   if (pattern) {
     const toTime = s => s.includes('-') ? s : s.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3');
     markers.push({
       time: toTime(pattern.uptrend_start_date),
       position: 'belowBar',
-      color: '#fbbf24',
+      color: corrected ? '#22c55e' : '#fbbf24',
       shape: 'arrowUp',
-      text: '上涨起点',
-      size: 3,
+      text: corrected ? '✓ 起点(纠)' : '上涨起点',
+      size: corrected ? 4 : 3,
     });
     markers.push({
       time: toTime(pattern.uptrend_end_date),
       position: 'aboveBar',
-      color: '#f97316',
+      color: corrected ? '#22c55e' : '#f97316',
       shape: 'circle',
-      text: '盘整起点',
-      size: 3,
+      text: corrected ? '✓ 峰顶(纠)' : '盘整起点',
+      size: corrected ? 4 : 3,
     });
     markers.push({
       time: toTime(pattern.consolidation_end_date),
       position: 'belowBar',
-      color: '#22c55e',
+      color: corrected ? '#22c55e' : '#22c55e',
       shape: 'arrowUp',
-      text: '突破',
-      size: 3,
+      text: corrected ? '✓ 结束(纠)' : '突破',
+      size: corrected ? 4 : 3,
     });
   }
   candleSeries.setMarkers(markers);
@@ -305,14 +319,15 @@ function renderPattern(p) {
   const el = document.getElementById('patternDetail');
   if (!p) { el.style.display='none'; return; }
   el.style.display = 'grid';
-  el.innerHTML = `
-    <div class="item"><div class="label">形态类型</div><div class="value">厂字形态</div></div>
-    <div class="item"><div class="label">综合评分</div><div class="value">${p.pattern_score.toFixed(2)}</div></div>
-    <div class="item"><div class="label">上涨涨幅</div><div class="value text-green">+${(p.uptrend_gain*100).toFixed(1)}%</div></div>
-    <div class="item"><div class="label">盘整天数</div><div class="value">${p.consolidation_days}天</div></div>
-    <div class="item"><div class="label">上涨段</div><div class="value">${p.uptrend_start_date} → ${p.uptrend_end_date}</div></div>
-    <div class="item"><div class="label">盘整段</div><div class="value">${p.consolidation_start_date} → ${p.consolidation_end_date}</div></div>
-  `;
+  var typeHtml = p.corrected
+    ? '<div class="item"><div class="label">形态类型</div><div class="value">厂字形态 <span style="color:var(--orange);font-size:11px">(已纠正)</span></div></div>'
+    : '<div class="item"><div class="label">形态类型</div><div class="value">厂字形态</div></div>';
+  el.innerHTML = typeHtml
+    + '<div class="item"><div class="label">综合评分</div><div class="value">'+p.pattern_score.toFixed(2)+'</div></div>'
+    + '<div class="item"><div class="label">上涨涨幅</div><div class="value text-green">+'+(p.uptrend_gain*100).toFixed(1)+'%</div></div>'
+    + '<div class="item"><div class="label">盘整天数</div><div class="value">'+p.consolidation_days+'天</div></div>'
+    + '<div class="item"><div class="label">上涨段</div><div class="value">'+p.uptrend_start_date+' → '+p.uptrend_end_date+'</div></div>'
+    + '<div class="item"><div class="label">盘整段</div><div class="value">'+p.consolidation_start_date+' → '+p.consolidation_end_date+'</div></div>';
 }
 
 function addLog(type, msg) {
@@ -616,7 +631,7 @@ async function submitChartCorrection() {
   var j = await r.json();
   cancelCorrect();
   if (j.code === 0) {
-    labeledStocks[code] = {type: 'corrected'};
+    labeledStocks[code] = {type: 'corrected', start: start, peak: peak, end: end};
     updateMLStats(j);
     showResults(scanResultsStore);
   }
