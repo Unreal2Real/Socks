@@ -74,37 +74,37 @@ class PatternRecognizer:
         return None
 
     def _is_uptrend_start(self, df: pd.DataFrame, idx: int) -> bool:
-        if not TechnicalIndicators.is_bullish_arrangement(df, idx):
-            return False
+        bull_count = 0
         for j in range(idx - 4, idx + 1):
-            if not TechnicalIndicators.is_bullish_arrangement(df, j):
-                return False
-        return True
+            if TechnicalIndicators.is_bullish_arrangement(df, j):
+                bull_count += 1
+        return bull_count >= 2
 
     def _scan_uptrend(self, df: pd.DataFrame,
                       start_idx: int) -> Optional[Tuple[int, float]]:
         start_price = df.loc[start_idx, 'close']
         peak_idx = start_idx
         peak_price = start_price
+        below_ma5_streak = 0
 
         max_i = len(df) - self.consolidation_days_min
         for i in range(start_idx + 1, max_i):
-            if not TechnicalIndicators.is_bullish_arrangement(df, i):
-                break
-
             current_price = df.loc[i, 'close']
+
             if current_price > peak_price:
                 peak_price = current_price
                 peak_idx = i
 
-            current_gain = (current_price - start_price) / start_price
-            if current_gain >= self.uptrend_gain_threshold:
-                uptrend_days = i - start_idx + 1
-                if uptrend_days < self.uptrend_min_days:
-                    continue
-                for j in range(i + 1, min(i + 5, len(df))):
-                    if df.loc[j, 'close'] < df.loc[j, 'ma5']:
-                        return peak_idx, (peak_price - start_price) / start_price
+            if df.loc[i, 'close'] < df.loc[i, 'ma5']:
+                below_ma5_streak += 1
+                if below_ma5_streak >= 2 and peak_price > start_price:
+                    current_gain = (peak_price - start_price) / start_price
+                    if current_gain >= self.uptrend_gain_threshold:
+                        uptrend_days = peak_idx - start_idx + 1
+                        if uptrend_days >= self.uptrend_min_days:
+                            return peak_idx, (peak_price - start_price) / start_price
+            else:
+                below_ma5_streak = 0
 
         return None
 
