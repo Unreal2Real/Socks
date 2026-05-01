@@ -8,16 +8,9 @@ CACHE_DIR = os.path.join(PROJECT_ROOT, 'data', 'cache')
 FACTORY_PATTERN = {
     'uptrend_gain': 0.06,
     'consolidation_days_min': 10,
-    'consolidation_days_max': 40,
-    'bandwidth': 0.30,
-    'volatility': 0.16,
-    'volume_ratio': 1.5,
-    'max_retrace_pct': 0.10,
+    'uptrend_min_days': 5,
+    'min_elevation': 0.08,
     'ma_periods': [5, 10, 20, 60],
-    'bb_period': 20,
-    'bb_std_dev': 2,
-    'volume_ma_period': 20,
-    'uptrend_min_days': 8,
 }
 
 SCAN = {
@@ -27,13 +20,6 @@ SCAN = {
     'default_limit': 200,
     'max_pattern_age_days': 60,
 }
-
-MAIN_BOARD_PREFIXES = {
-    'sh': ['600', '601', '603', '605'],
-    'sz': ['000', '001', '002', '003'],
-}
-
-EXCLUDED_PREFIXES = ['300', '301', '688', '8', '4']
 
 INDEX_KEYWORDS = [
     '指数', '基金', '国债', '企债', '上证', '深证', '综指',

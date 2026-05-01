@@ -11,14 +11,10 @@ from indicators.technical import TechnicalIndicators
 class PatternRecognizer:
 
     def __init__(self, config: dict):
-        self.uptrend_gain_threshold = config.get('uptrend_gain', 0.20)
+        self.uptrend_gain_threshold = config.get('uptrend_gain', 0.15)
         self.consolidation_days_min = config.get('consolidation_days_min', 10)
-        self.consolidation_days_max = config.get('consolidation_days_max', 20)
-        self.bandwidth_threshold = config.get('bandwidth', 0.15)
-        self.volatility_threshold = config.get('volatility', 0.15)
-        self.volume_ratio_threshold = config.get('volume_ratio', 0.5)
         self.uptrend_min_days = config.get('uptrend_min_days', 5)
-        self.max_retrace_pct = config.get('max_retrace_pct', 0.08)
+        self.min_elevation = config.get('min_elevation', 0.10)
 
     def find_pattern(self, df: pd.DataFrame,
                      max_days_back: int = None) -> Optional[dict]:
@@ -32,39 +28,48 @@ class PatternRecognizer:
         df = TechnicalIndicators.calculate_all(df.ffill().bfill())
 
         n = len(df)
-        start = n - self.consolidation_days_max - 1
+        start = n - self.consolidation_days_min - 1
         end = 20
 
         for i in range(start, end, -1):
-            if self._is_uptrend_start(df, i):
-                uptrend_result = self._scan_uptrend(df, i)
-                if uptrend_result:
-                    uptrend_end_idx, uptrend_gain = uptrend_result
+            if not self._is_uptrend_start(df, i):
+                continue
 
-                    last_idx = len(df) - 1
-                    ongoing_days = last_idx - uptrend_end_idx
-                    if ongoing_days >= self.consolidation_days_min and \
-                       self._is_valid_consolidation(df, uptrend_end_idx, last_idx, ongoing=True):
-                        consolidation_result = (last_idx, ongoing_days)
-                    else:
-                        consolidation_result = self._scan_consolidation(df, uptrend_end_idx)
+            uptrend_result = self._scan_uptrend(df, i)
+            if not uptrend_result:
+                continue
 
-                    if consolidation_result:
-                        consolidation_end_idx, consolidation_days = consolidation_result
-                        return {
-                            'uptrend_start_idx': i,
-                            'uptrend_start_date': str(df.loc[i, 'date'])[:10],
-                            'uptrend_end_idx': uptrend_end_idx,
-                            'uptrend_end_date': str(df.loc[uptrend_end_idx, 'date'])[:10],
-                            'uptrend_gain': round(uptrend_gain, 4),
-                            'consolidation_start_idx': uptrend_end_idx,
-                            'consolidation_start_date': str(df.loc[uptrend_end_idx, 'date'])[:10],
-                            'consolidation_end_idx': consolidation_end_idx,
-                            'consolidation_end_date': str(df.loc[consolidation_end_idx, 'date'])[:10],
-                            'consolidation_days': consolidation_days,
-                            'pattern_score': self._calculate_pattern_score(df, i, uptrend_end_idx, consolidation_end_idx),
-                            'type': 'factory',
-                        }
+            uptrend_end_idx, uptrend_gain = uptrend_result
+            start_price = df.loc[i, 'close']
+
+            last_idx = n - 1
+            ongoing_days = last_idx - uptrend_end_idx
+            if ongoing_days >= self.consolidation_days_min and \
+               self._is_elevated(df, uptrend_end_idx, last_idx, start_price):
+                consolidation_end_idx = last_idx
+                consolidation_days = ongoing_days
+            else:
+                consol = self._scan_consolidation(df, uptrend_end_idx, start_price)
+                if consol:
+                    consolidation_end_idx, consolidation_days = consol
+                else:
+                    continue
+
+            return {
+                'uptrend_start_idx': i,
+                'uptrend_start_date': str(df.loc[i, 'date'])[:10],
+                'uptrend_end_idx': uptrend_end_idx,
+                'uptrend_end_date': str(df.loc[uptrend_end_idx, 'date'])[:10],
+                'uptrend_gain': round(uptrend_gain, 4),
+                'consolidation_start_idx': uptrend_end_idx,
+                'consolidation_start_date': str(df.loc[uptrend_end_idx, 'date'])[:10],
+                'consolidation_end_idx': consolidation_end_idx,
+                'consolidation_end_date': str(df.loc[consolidation_end_idx, 'date'])[:10],
+                'consolidation_days': consolidation_days,
+                'pattern_score': self._calculate_score(i, uptrend_end_idx,
+                                                       consolidation_end_idx, df),
+                'type': 'factory',
+            }
 
         return None
 
@@ -76,12 +81,14 @@ class PatternRecognizer:
                 return False
         return True
 
-    def _scan_uptrend(self, df: pd.DataFrame, start_idx: int) -> Optional[Tuple[int, float]]:
+    def _scan_uptrend(self, df: pd.DataFrame,
+                      start_idx: int) -> Optional[Tuple[int, float]]:
         start_price = df.loc[start_idx, 'close']
         peak_idx = start_idx
         peak_price = start_price
 
-        for i in range(start_idx + 1, len(df) - self.consolidation_days_min):
+        max_i = len(df) - self.consolidation_days_min
+        for i in range(start_idx + 1, max_i):
             if not TechnicalIndicators.is_bullish_arrangement(df, i):
                 break
 
@@ -101,81 +108,43 @@ class PatternRecognizer:
 
         return None
 
-    def _scan_consolidation(self, df: pd.DataFrame, start_idx: int) -> Optional[Tuple[int, int]]:
-        for i in range(start_idx + 1, min(start_idx + self.consolidation_days_max + 1, len(df))):
+    def _scan_consolidation(self, df: pd.DataFrame,
+                            start_idx: int,
+                            start_price: float) -> Optional[Tuple[int, int]]:
+        n = len(df)
+        max_end = min(start_idx + 180, n)
+
+        for i in range(start_idx + self.consolidation_days_min, max_end):
             days = i - start_idx
-            if days < self.consolidation_days_min:
-                continue
-            if self._is_valid_consolidation(df, start_idx, i):
+            if self._is_elevated(df, start_idx, i, start_price):
                 return i, days
         return None
 
-    def _is_valid_consolidation(self, df: pd.DataFrame, start_idx: int, end_idx: int,
-                                 ongoing: bool = False) -> bool:
+    def _is_elevated(self, df: pd.DataFrame,
+                     start_idx: int, end_idx: int,
+                     uptrend_start_price: float) -> bool:
         period_df = df.loc[start_idx:end_idx]
-
-        if 'bb_bandwidth' not in period_df.columns:
-            return False
-
-        peak_price = period_df.iloc[0]['close']
         min_close = period_df['close'].min()
-        avg_close = period_df['close'].mean()
+        elevated_pct = (min_close - uptrend_start_price) / uptrend_start_price
+        return elevated_pct >= self.min_elevation
 
-        retrace = (peak_price - min_close) / peak_price
-        retrace_limit = self.max_retrace_pct * 1.3 if ongoing else self.max_retrace_pct
-        if retrace > retrace_limit:
-            return False
-
-        avg_drop = (peak_price - avg_close) / peak_price
-        if avg_drop > self.max_retrace_pct * 0.6:
-            return False
-
-        avg_bandwidth = period_df['bb_bandwidth'].mean()
-        bw_limit = self.bandwidth_threshold * 1.5 if ongoing else self.bandwidth_threshold
-        if avg_bandwidth >= bw_limit:
-            return False
-
-        volatility = TechnicalIndicators.calculate_volatility(df, start_idx, end_idx)
-        vol_limit = self.volatility_threshold * 1.5 if ongoing else self.volatility_threshold
-        if volatility >= vol_limit:
-            return False
-
-        if not ongoing:
-            avg_volume_ratio = period_df['volume_ratio'].mean()
-            if avg_volume_ratio >= self.volume_ratio_threshold:
-                return False
-
-        return True
-
-    def _calculate_pattern_score(self, df: pd.DataFrame, uptrend_start: int,
-                                  uptrend_end: int, consolidation_end: int) -> float:
+    def _calculate_score(self, uptrend_start: int, uptrend_end: int,
+                         consolidation_end: int, df: pd.DataFrame) -> float:
         score = 0.0
-
         gain = TechnicalIndicators.calculate_price_change(df, uptrend_start, uptrend_end)
-        if gain >= 0.20:
-            score += 0.3
-        elif gain >= 0.15:
-            score += 0.2
+        if gain >= 0.80: score += 0.4
+        elif gain >= 0.40: score += 0.3
+        elif gain >= 0.15: score += 0.2
+        elif gain >= 0.06: score += 0.1
 
-        vol = TechnicalIndicators.calculate_volatility(df, uptrend_end, consolidation_end)
-        if vol <= 0.10:
-            score += 0.3
-        elif vol <= 0.15:
-            score += 0.2
+        start_p = df.loc[uptrend_start, 'close']
+        period = df.loc[uptrend_end:consolidation_end]
+        min_c = period['close'].min()
+        elevation = (min_c - start_p) / start_p
 
-        consol_df = df.loc[uptrend_end:consolidation_end]
-        if 'bb_bandwidth' in consol_df.columns:
-            avg_bw = consol_df['bb_bandwidth'].mean()
-            if avg_bw <= 0.10:
-                score += 0.2
-            elif avg_bw <= 0.15:
-                score += 0.1
-
-        if 'volume_ratio' in consol_df.columns:
-            avg_vr = consol_df['volume_ratio'].mean()
-            if avg_vr <= 0.4:
-                score += 0.2
-            elif avg_vr <= 0.5:
-                score += 0.1
+        if elevation >= 0.80: score += 0.6
+        elif elevation >= 0.40: score += 0.4
+        elif elevation >= 0.15: score += 0.2
+        elif elevation >= 0.06: score += 0.1
 
         return min(score, 1.0)

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import pandas as pd
 
-from _config import TDX_PATH, CACHE_DIR, MAIN_BOARD_PREFIXES, EXCLUDED_PREFIXES, INDEX_KEYWORDS
+from _config import TDX_PATH, CACHE_DIR, INDEX_KEYWORDS
 from data.cache import DataCache
 
 
@@ -283,24 +283,16 @@ class DataFetcher:
     def _is_main_board(code: str, name: str) -> bool:
         plain = code.split('.')[-1] if '.' in code else code.zfill(6)
 
-        for prefix in ['600', '601', '603', '605']:
-            if plain.startswith(prefix):
-                return True
-
-        for prefix in ['688', '300', '301', '8', '4']:
-            if plain.startswith(prefix):
-                return False
-
-        if plain.startswith('000') or plain.startswith('001') or plain.startswith('002'):
-            for kw in INDEX_KEYWORDS:
-                if kw in name:
-                    return False
-            if len(name) >= 2 and not any(
-                kw in name for kw in ['指数', '基金', '债']):
-                return True
+        if not plain.isdigit() or len(plain) != 6:
             return False
 
-        return False
+        for kw in INDEX_KEYWORDS:
+            if kw in name:
+                return False
+        if any(kw in name for kw in ['指数', '基金', '债', '购', '沽']):
+            return False
+
+        return True
 
     def cache_stats(self) -> dict:
         return self._cache.stats()

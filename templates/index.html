@@ -93,9 +93,9 @@ function createChart() {
   });
 
   candleSeries = chart.addCandlestickSeries({
-    upColor: '#22c55e', downColor: '#ef4444',
-    borderUpColor: '#22c55e', borderDownColor: '#ef4444',
-    wickUpColor: '#22c55e', wickDownColor: '#ef4444',
+    upColor: '#dc2626', downColor: '#16a34a',
+    borderUpColor: '#dc2626', borderDownColor: '#16a34a',
+    wickUpColor: '#dc2626', wickDownColor: '#16a34a',
   });
 
   volumeSeries = chart.addHistogramSeries({
@@ -137,7 +137,7 @@ function renderKline(data, pattern) {
   data.forEach((d,i) => {
     const t = d.time.includes('-') ? d.time : d.time.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3');
     candles.push({time:t,open:d.open,high:d.high,low:d.low,close:d.close});
-    volumes.push({time:t,value:d.volume,color: d.close>=d.open?'rgba(34,197,94,.3)':'rgba(239,68,68,.3)'});
+    volumes.push({time:t,value:d.volume,color: d.close>=d.open?'rgba(220,38,38,.25)':'rgba(22,163,74,.25)'});
   });
   candleSeries.setData(candles);
   volumeSeries.setData(volumes);
