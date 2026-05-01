@@ -183,7 +183,8 @@ class DataFetcher:
                 data = json.loads(cache_path.read_text())
                 age = time.time() - data.get('ts', 0)
                 if age < 86400:
-                    self._stock_list_cache = data['stocks']
+                    stocks = [(c, n) for c, n in data['stocks'] if self._is_main_board(c, n)]
+                    self._stock_list_cache = stocks
                     return self._stock_list_cache
             except Exception:
                 pass
