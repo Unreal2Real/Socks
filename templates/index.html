@@ -144,6 +144,7 @@ let chart = null, candleSeries = null, volumeSeries = null, lineSeries = {};
 let scanTimer = null;
 let viewedStocks = new Set();
 let scanResultsStore = [];
+let labeledStocks = {};
 let correctMode = false, correctClicks = [], correctCode = '', correctName = '';
 let chartClickHandler = null;
 
@@ -360,6 +361,16 @@ function showResults(results) {
     const isNew = !viewedStocks.has(fid);
     const dot = isNew ? '<span class=\"new-dot\"></span>' : '';
     const rowAttrs = (st==='exited'?' style=\"opacity:.5\"':'') + (isNew?' class=\"unviewed\"':'');
+    const ls = labeledStocks[fid];
+    var mlCell;
+    if (ls) {
+      if (ls.type === 'good') mlCell = '<span class=\"ml-model-ready\" style=\"font-size:11px\">✓ 已标注</span>';
+      else if (ls.type === 'corrected') mlCell = '<span class=\"ml-corrected\" style=\"font-size:11px\">✗ 已纠正</span>';
+      else if (ls.type === 'wrong') mlCell = '<span class=\"ml-corrected\" style=\"font-size:11px\">✗ 完全不符</span>';
+      else mlCell = '<button class=\"btn-ml btn-accept\" onclick=\"event.stopPropagation();mlAction(\'good\',\''+fid+'\')\" title=\"形态正确\">✅</button> <button class=\"btn-ml btn-reject\" onclick=\"event.stopPropagation();mlAction(\'bad\',\''+fid+'\')\" title=\"形态不对\">❌</button>';
+    } else {
+      mlCell = '<button class=\"btn-ml btn-accept\" onclick=\"event.stopPropagation();mlAction(\'good\',\''+fid+'\')\" title=\"形态正确\">✅</button> <button class=\"btn-ml btn-reject\" onclick=\"event.stopPropagation();mlAction(\'bad\',\''+fid+'\')\" title=\"形态不对\">❌</button>';
+    }
     html += '<tr id=\"row-'+fid+'\" data-code=\"'+fid+'\"'+rowAttrs+'><td>'+dot+'</td>'+
       '<td><code>'+fid+'</code></td><td>'+p.stock_name+'</td>'+
       '<td><span class=\"tag tag-green\">'+p.pattern_score.toFixed(2)+'</span></td>'+
@@ -367,10 +378,7 @@ function showResults(results) {
       '<td>'+p.consolidation_days+'天</td>'+
       '<td><span class=\"tag '+(statusTag[st]||'tag-gray')+'\">'+(statusLabel[st]||st)+'</span></td>'+
       '<td>'+p.consolidation_end_date+'</td>'+
-      '<td id=\"ml-'+fid+'\">'+
-      '<button class=\"btn-ml btn-accept\" onclick=\"event.stopPropagation();mlAction(\'good\',\''+fid+'\')\" title=\"形态正确\">✅</button> '+
-      '<button class=\"btn-ml btn-reject\" onclick=\"event.stopPropagation();mlAction(\'bad\',\''+fid+'\')\" title=\"形态不对\">❌</button>'+
-      '</td></tr>';
+      '<td id=\"ml-'+fid+'\">'+mlCell+'</td></tr>';
   });
   html += '</tbody></table>';
   el.innerHTML = html;
@@ -452,8 +460,9 @@ async function labelGood(code, name) {
   });
   const j = await r.json();
   if (j.code === 0) {
-    document.getElementById(`ml-${code}`).innerHTML = '<span class="ml-model-ready" style="font-size:11px">✓ 已标注</span>';
+    labeledStocks[code] = {type: 'good'};
     updateMLStats(j);
+    showResults(scanResultsStore);
   }
 }
 
@@ -472,8 +481,9 @@ async function labelBad(code, name) {
     });
     var j = await r.json();
     if (j.code === 0) {
-      document.getElementById('ml-'+code).innerHTML = '<span class="ml-corrected" style="font-size:11px">✗ 完全不符</span>';
+      labeledStocks[code] = {type: 'wrong'};
       updateMLStats(j);
+      showResults(scanResultsStore);
     }
     return;
   }
@@ -573,8 +583,9 @@ async function submitChartCorrection() {
   var j = await r.json();
   cancelCorrect();
   if (j.code === 0) {
-    document.getElementById('ml-'+code).innerHTML = '<span class="ml-corrected" style="font-size:11px">✗ 已纠正</span>';
+    labeledStocks[code] = {type: 'corrected'};
     updateMLStats(j);
+    showResults(scanResultsStore);
   }
 }
 
