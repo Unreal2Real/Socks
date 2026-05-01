@@ -27,11 +27,19 @@ class PatternRecognizer:
         df = TechnicalIndicators.calculate_all(df.ffill().bfill())
         n = len(df)
 
-        result = self._scan_backward(df, n)
-        if result is None:
-            result = self._fallback_scan(df, n)
+        # Run all three scanners concurrently, pick the best result based on pattern_score
+        results = []
+        for weight, scanner in [(1.0, self._scan_backward), (0.95, self._fallback_scan), (0.9, self._price_peak_fallback)]:
+            res = scanner(df, n)
+            if res is not None:
+                res['pattern_score'] = res['pattern_score'] * weight
+                results.append(res)
 
-        return result
+        if not results:
+            return None
+
+        best = max(results, key=lambda r: r['pattern_score'])
+        return best
 
     def _scan_backward(self, df: pd.DataFrame, n: int) -> Optional[dict]:
         start_i = n - self.consolidation_days_min - 1
@@ -176,6 +184,56 @@ class PatternRecognizer:
                     best_i = i
         if best_i is not None:
             return best_i, best_days
+        return None
+
+    def _price_peak_fallback(self, df: pd.DataFrame, n: int) -> Optional[dict]:
+        w = 10
+        peaks = []
+        for i in range(w, n - self.consolidation_days_min - w):
+            cur = float(df.loc[i, 'close'])
+            if cur > float(df.loc[i-w:i-1, 'close'].max()) and \
+               cur > float(df.loc[i+1:i+w, 'close'].max()):
+                peaks.append(i)
+
+        best = None
+        best_eff = -1
+
+        for pi in peaks:
+            pp = float(df.loc[pi, 'close'])
+            lookback = min(pi - 5, 80)
+            for si in range(pi - 5, pi - lookback, -1):
+                if si < 10:
+                    continue
+                sp = float(df.loc[si, 'close'])
+                gain = (pp - sp) / sp
+                up_days = pi - si + 1
+                if gain < self.uptrend_gain_threshold or up_days < self.uptrend_min_days:
+                    continue
+                if pp < float(df.loc[si:pi, 'close'].max()):
+                    continue
+
+                consol = self._scan_consolidation(df, pi, sp)
+                if consol:
+                    ei, days = consol
+                    efficiency = gain / max(up_days, 1)
+                    if efficiency > best_eff:
+                        best_eff = efficiency
+                        best = (si, pi, gain, ei, days)
+                    break
+
+                og_days = n - 1 - pi
+                if og_days >= self.consolidation_days_min:
+                    min_c = float(df.loc[pi:n-1, 'close'].min())
+                    if (min_c - sp) / sp >= self.min_elevation:
+                        efficiency = gain / max(up_days, 1)
+                        if efficiency > best_eff:
+                            best_eff = efficiency
+                            best = (si, pi, gain, n - 1, og_days)
+                        break
+
+        if best:
+            si, pi, g, ei, d = best
+            return self._build_result(df, si, pi, g, ei, d)
         return None
 
     def _build_result(self, df, start_i, peak_idx, gain, end_idx, days):
