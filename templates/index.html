@@ -38,6 +38,8 @@ button:hover{opacity:.9}
 .ml-overlay.active{display:block}
 .ml-stats{font-size:11px;color:var(--dim);margin-bottom:8px;display:flex;gap:16px}
 .ml-stats strong{color:var(--text)}
+.ml-model-ready{color:var(--green)}
+.ml-corrected{color:var(--orange)}
 input{width:120px}
 #kline-chart{width:100%;height:400px}
 .progress-wrap{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:8px 0}
@@ -59,6 +61,8 @@ tr{cursor:pointer}
 .pattern-info{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:12px}
 .pattern-info .item{background:rgba(255,255,255,.03);padding:8px 10px;border-radius:4px}
 .pattern-info .label{font-size:11px;color:var(--dim)}.pattern-info .value{font-size:14px;font-weight:600}
+.text-green{color:var(--green)}
+.text-dim{color:var(--dim)}
 .status{font-size:13px;color:var(--dim);margin:4px 0}
 </style>
 </head>
@@ -96,7 +100,7 @@ tr{cursor:pointer}
 <div class="ml-overlay" id="mlOverlay" onclick="closeMLPanel()"></div>
 <div class="ml-panel" id="mlPanel">
   <h3>🔧 纠正形态 (告诉模型什么样是对的)</h3>
-  <p style="font-size:12px;color:var(--dim);margin-bottom:12px" id="mlPanelCode"></p>
+  <p class="text-dim" style="font-size:12px;margin-bottom:12px" id="mlPanelCode"></p>
   <label>正确的上涨起点</label>
   <input id="mlCorrectStart" type="text" placeholder="YYYY-MM-DD">
   <label>正确的盘整开始(峰顶)</label>
@@ -226,7 +230,7 @@ function renderPattern(p) {
   el.innerHTML = `
     <div class="item"><div class="label">形态类型</div><div class="value">厂字形态</div></div>
     <div class="item"><div class="label">综合评分</div><div class="value">${p.pattern_score.toFixed(2)}</div></div>
-    <div class="item"><div class="label">上涨涨幅</div><div class="value" style="color:var(--green)">+${(p.uptrend_gain*100).toFixed(1)}%</div></div>
+    <div class="item"><div class="label">上涨涨幅</div><div class="value text-green">+${(p.uptrend_gain*100).toFixed(1)}%</div></div>
     <div class="item"><div class="label">盘整天数</div><div class="value">${p.consolidation_days}天</div></div>
     <div class="item"><div class="label">上涨段</div><div class="value">${p.uptrend_start_date} → ${p.uptrend_end_date}</div></div>
     <div class="item"><div class="label">盘整段</div><div class="value">${p.consolidation_start_date} → ${p.consolidation_end_date}</div></div>
@@ -280,7 +284,7 @@ async function pollProgress() {
 
 function showResults(results) {
   const el = document.getElementById('scanResults');
-  if (!results.length) { el.innerHTML = '<p style="color:var(--dim);padding:16px">未发现匹配形态</p>'; return; }
+  if (!results.length) { el.innerHTML = '<p class=\"text-dim\" style=\"padding:16px\">未发现匹配形态</p>'; return; }
 
   const statusLabel = {new:'🆕 新增', kept:'✅ 保持', changed:'📈 变化', exited:'🚫 退出'};
   const statusTag = {new:'tag-green', kept:'tag-blue', changed:'tag-orange', exited:'tag-gray'};
@@ -292,7 +296,7 @@ function showResults(results) {
     html += `<tr id="row-${fid}"${st==='exited'?' style="opacity:.5"':''}>
       <td><code onclick="viewStock('${fid}')">${fid}</code></td><td>${p.stock_name}</td>
       <td><span class="tag tag-green">${p.pattern_score.toFixed(2)}</span></td>
-      <td style="color:var(--green)">+${(p.uptrend_gain*100).toFixed(1)}%</td>
+      <td class="text-green">+${(p.uptrend_gain*100).toFixed(1)}%</td>
       <td>${p.consolidation_days}天</td>
       <td><span class="tag ${statusTag[st]||'tag-gray'}">${statusLabel[st]||st}</span></td>
       <td>${p.consolidation_end_date}</td>
@@ -372,7 +376,7 @@ async function labelGood(code, name) {
   });
   const j = await r.json();
   if (j.code === 0) {
-    document.getElementById(`ml-${code}`).innerHTML = '<span style="color:var(--green);font-size:11px">✓ 已标注</span>';
+    document.getElementById(`ml-${code}`).innerHTML = '<span class="ml-model-ready" style="font-size:11px">✓ 已标注</span>';
     updateMLStats(j);
   }
 }
@@ -413,7 +417,7 @@ async function submitCorrection() {
   const j = await r.json();
   closeMLPanel();
   if (j.code === 0) {
-    document.getElementById(`ml-${code}`).innerHTML = '<span style="color:var(--orange);font-size:11px">✗ 已纠正</span>';
+    document.getElementById(`ml-${code}`).innerHTML = '<span class="ml-corrected" style="font-size:11px">✗ 已纠正</span>';
     updateMLStats(j);
   }
 }
@@ -423,7 +427,7 @@ function updateMLStats(j) {
   const s = j.stats || {};
   const m = j.metrics || {};
   el.style.display = '';
-  el.innerHTML = `ML标注: <strong>${s.total||0}条</strong> (✅${s.good||0} ❌${s.bad||0}) ${m.train_accuracy ? '| 训练准确率: <strong>'+(m.train_accuracy*100).toFixed(0)+'%</strong>' : ''} ${s.total >= 5 ? '| 模型: <strong style=\\'color:var(--green)\\'>已就绪</strong>' : '| 还需 <strong>'+(5-(s.total||0))+'</strong> 条标注'}`;
+  el.innerHTML = 'ML标注: <strong>'+(s.total||0)+'条</strong> (✅'+(s.good||0)+' ❌'+(s.bad||0)+') '+(m.train_accuracy?'| 训练准确率: <strong>'+(m.train_accuracy*100).toFixed(0)+'%</strong> ':'')+(s.total>=5?'| 模型: <strong class=\"ml-model-ready\">已就绪</strong>':'| 还需 <strong>'+(5-(s.total||0))+'</strong> 条标注');
 }
 
 async function loadMLStats() {
@@ -435,7 +439,7 @@ async function loadMLStats() {
       const l = j.labels || {};
       const el = document.getElementById('mlStats');
       el.style.display = '';
-      el.innerHTML = `ML标注: <strong>${l.total||0}条</strong> (✅${l.good||0} ❌${l.bad||0}) ${l.total >= 5 ? '| 模型: <strong style=\\'color:var(--green)\\'>已就绪</strong>' : '| 还需 <strong>'+(5-(l.total||0))+'</strong> 条标注可训练模型'}`;
+      el.innerHTML = 'ML标注: <strong>'+(l.total||0)+'条</strong> (✅'+(l.good||0)+' ❌'+(l.bad||0)+') '+(l.total>=5?'| 模型: <strong class=\"ml-model-ready\">已就绪</strong>':'| 还需 <strong>'+(5-(l.total||0))+'</strong> 条标注可训练模型');
     }
   } catch(e) {}
 }
