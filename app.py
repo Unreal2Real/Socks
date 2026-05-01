@@ -11,6 +11,7 @@ from _config import FACTORY_PATTERN, SCAN
 from ml import labels, trainer, features as ml_features
 
 app = Flask(__name__, template_folder='templates', static_folder='.')
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 fetcher = DataFetcher()
 recognizer = PatternRecognizer(FACTORY_PATTERN)

@@ -194,6 +194,7 @@ async function analyzeStock() {
     if (j.code !== 0) return alert(j.msg);
     document.getElementById('kline-placeholder').style.display = 'none';
     document.getElementById('kline-chart').style.display = 'block';
+    if (chart) { chart.remove(); chart = null; }
     renderKline(j.data, j.pattern);
     renderPattern(j.pattern);
     var cs = document.getElementById('currentStock');
@@ -492,8 +493,6 @@ async function loadMLStats() {
     }
   } catch(e) {}
 }
-
-createChart();
 </script>
 </body>
 </html>
