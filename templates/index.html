@@ -96,7 +96,8 @@ tr.unviewed td:first-child{font-weight:700}
     <span class="step active" id="stepStart">①上涨起点</span>
     <span class="step" id="stepPeak">②峰顶</span>
     <span class="step" id="stepEnd">③盘整结束</span>
-    <span style="float:right;cursor:pointer" onclick="cancelCorrect()">✕</span>
+    <button class="btn-sm btn-primary" id="btnConfirm" style="display:none;float:right;margin-left:8px" onclick="submitChartCorrection()">确认提交</button>
+    <span style="float:right;cursor:pointer;margin-left:12px" onclick="cancelCorrect()">✕</span>
     <div class="hint" id="correctHint">点击K线上任意蜡烛 → 选中日期</div>
   </div>
   <div id="kline-chart"></div>
@@ -457,6 +458,26 @@ async function labelGood(code, name) {
 }
 
 async function labelBad(code, name) {
+  var choice = confirm('这个形态有问题：\n\n点"确定" → 在K线上纠正日期\n点"取消" → 标记为完全不符');
+  if (!choice) {
+    var data = await loadMLFeatures(code);
+    var r = await fetch('/api/ml/label', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        stock_code: code, stock_name: name, label: 'bad',
+        correct_start: '', correct_peak: '', correct_end: '',
+        features: (data && data.features) ? data.features : {},
+      }),
+    });
+    var j = await r.json();
+    if (j.code === 0) {
+      document.getElementById('ml-'+code).innerHTML = '<span class="ml-corrected" style="font-size:11px">✗ 完全不符</span>';
+      updateMLStats(j);
+    }
+    return;
+  }
+
   cancelCorrect();
   correctCode = code;
   correctName = name;
@@ -467,13 +488,14 @@ async function labelBad(code, name) {
   document.getElementById('kline-chart').style.display = 'block';
   document.getElementById('patternDetail').style.display = 'none';
   try {
-    var r = await fetch('/api/stock/'+code+'?days=500');
-    var j = await r.json();
-    if (j.code !== 0) return alert(j.msg);
+    var r2 = await fetch('/api/stock/'+code+'?days=500');
+    var j2 = await r2.json();
+    if (j2.code !== 0) return alert(j2.msg);
     if (chart) { chart.remove(); chart = null; }
     correctMode = true;
-    renderKline(j.data, j.pattern);
+    renderKline(j2.data, j2.pattern);
     document.getElementById('correctBanner').style.display = 'block';
+    document.getElementById('btnConfirm').style.display = 'none';
     updateCorrectSteps();
   } catch(e) { alert('加载失败: '+e.message); }
 }
@@ -484,6 +506,7 @@ function cancelCorrect() {
   correctCode = '';
   correctName = '';
   document.getElementById('correctBanner').style.display = 'none';
+  document.getElementById('btnConfirm').style.display = 'none';
   document.getElementById('stepStart').className = 'step';
   document.getElementById('stepPeak').className = 'step';
   document.getElementById('stepEnd').className = 'step';
@@ -502,8 +525,9 @@ function updateCorrectSteps() {
   if (n === 1) document.getElementById('correctHint').textContent = '✅ 起点: '+correctClicks[0]+' | 下一步：点击峰顶';
   else if (n === 2) document.getElementById('correctHint').textContent = '✅ 起点: '+correctClicks[0]+' | ✅ 峰顶: '+correctClicks[1]+' | 下一步：点击盘整结束';
   else if (n >= 3) {
-    document.getElementById('correctHint').textContent = '✅ 起点: '+correctClicks[0]+' | ✅ 峰顶: '+correctClicks[1]+' | ✅ 结束: '+correctClicks[2]+' | 正在提交…';
-    submitChartCorrection();
+    document.getElementById('correctHint').textContent = '✅ 起点: '+correctClicks[0]+' | ✅ 峰顶: '+correctClicks[1]+' | ✅ 结束: '+correctClicks[2];
+    document.getElementById('btnConfirm').style.display = '';
+    correctMode = false;
   }
 }
 
