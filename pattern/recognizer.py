@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 import sys, os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -10,10 +10,10 @@ from indicators.technical import TechnicalIndicators
 class PatternRecognizer:
 
     def __init__(self, config: dict):
-        self.uptrend_gain_threshold = config.get('uptrend_gain', 0.15)
+        self.uptrend_gain_threshold = config.get('uptrend_gain', 0.06)
         self.consolidation_days_min = config.get('consolidation_days_min', 10)
         self.uptrend_min_days = config.get('uptrend_min_days', 5)
-        self.min_elevation = config.get('min_elevation', 0.10)
+        self.min_elevation = config.get('min_elevation', 0.08)
 
     def find_pattern(self, df: pd.DataFrame,
                      max_days_back: int = None) -> Optional[dict]:
@@ -26,87 +26,148 @@ class PatternRecognizer:
 
         df = TechnicalIndicators.calculate_all(df.ffill().bfill())
         n = len(df)
-        start_i = n - self.consolidation_days_min - 1
 
-        best = None
-        best_score = -1
+        gc_starts = self._golden_crosses(df, n)
+        all_candidates = []
 
-        for i in range(start_i, 20, -1):
-            uptrend = self._scan_uptrend(df, i)
-            if not uptrend:
+        for start_idx in gc_starts:
+            result = self._trace_uptrend(df, start_idx, n)
+            if result is None:
                 continue
+            peak_idx, gain = result
+            ci = self._check_consolidation(df, start_idx, peak_idx, gain, n)
+            if ci:
+                all_candidates.append(ci)
 
-            peak_idx, gain = uptrend
-            start_price = df.loc[i, 'close']
-            efficiency = gain / (peak_idx - i + 1)
+        if not all_candidates:
+            fallback = self._fallback_scan(df, n)
+            all_candidates = fallback if fallback else []
 
-            consol = self._scan_consolidation(df, peak_idx, start_price)
-            if consol:
-                end_idx, consol_days = consol
-                if efficiency > best_score:
-                    best_score = efficiency
-                    best = ('done', i, peak_idx, gain, end_idx, consol_days)
-                continue
+        if not all_candidates:
+            return None
 
-            last_idx = n - 1
-            if last_idx - peak_idx >= self.consolidation_days_min:
-                consol_df = df.loc[peak_idx:last_idx]
-                if (consol_df['close'].min() - start_price) / start_price >= self.min_elevation:
-                    if efficiency > best_score:
-                        best_score = efficiency
-                        best = ('ongoing', i, peak_idx, gain, last_idx, last_idx - peak_idx)
+        best = max(all_candidates, key=lambda c: c['score'])
+        return {
+            'uptrend_start_idx': best['si'],
+            'uptrend_start_date': best['sd'],
+            'uptrend_end_idx': best['pi'],
+            'uptrend_end_date': best['pd'],
+            'uptrend_gain': round(best['gain'], 4),
+            'consolidation_start_idx': best['pi'],
+            'consolidation_start_date': best['pd'],
+            'consolidation_end_idx': best['ei'],
+            'consolidation_end_date': best['ed'],
+            'consolidation_days': best['days'],
+            'pattern_score': round(best['gain'], 2),
+            'type': 'factory',
+        }
 
-        if best:
-            _, i, peak_idx, gain, end_idx, consol_days = best
-            return self._build_result(df, i, peak_idx, gain, end_idx, consol_days)
+    def _golden_crosses(self, df: pd.DataFrame, n: int) -> List[int]:
+        crosses = []
+        for i in range(10, n - self.consolidation_days_min - self.uptrend_min_days):
+            ma5p = float(df.loc[i-1, 'ma5']); ma10p = float(df.loc[i-1, 'ma10'])
+            ma5n = float(df.loc[i, 'ma5']); ma10n = float(df.loc[i, 'ma10'])
+            if ma5p <= ma10p and ma5n > ma10n:
+                crosses.append(i)
+        return crosses
 
-        return None
-
-    def _scan_uptrend(self, df: pd.DataFrame, start_idx: int) -> Optional[Tuple[int, float]]:
-        start_price = df.loc[start_idx, 'close']
+    def _trace_uptrend(self, df: pd.DataFrame, start_idx: int, n: int) -> Optional[Tuple[int, float]]:
+        sp = float(df.loc[start_idx, 'close'])
         peak_idx = start_idx
-        peak_price = start_price
-        below_ma5 = 0
-        max_i = len(df) - self.consolidation_days_min
+        pp = sp
 
-        for i in range(start_idx + 1, max_i):
-            cur = df.loc[i, 'close']
-            if cur > peak_price:
-                peak_price = cur
+        limit = n - self.consolidation_days_min
+        for i in range(start_idx + 1, limit):
+            cur = float(df.loc[i, 'close'])
+            if cur > pp:
+                pp = cur
                 peak_idx = i
 
             if df.loc[i, 'close'] < df.loc[i, 'ma5']:
-                below_ma5 += 1
-                if below_ma5 >= 3 and peak_price > start_price:
-                    gain = (peak_price - start_price) / start_price
-                    if gain >= self.uptrend_gain_threshold and peak_idx - start_idx + 1 >= self.uptrend_min_days:
+                below = 1
+                for j in range(i + 1, min(i + 4, n)):
+                    if df.loc[j, 'close'] < df.loc[j, 'ma5']:
+                        below += 1
+                    else:
+                        break
+                if below >= 3:
+                    gain = (pp - sp) / sp
+                    up_days = peak_idx - start_idx + 1
+                    if gain >= self.uptrend_gain_threshold and up_days >= self.uptrend_min_days:
                         return peak_idx, gain
-            else:
-                below_ma5 = 0
+                    return None
 
+        gain = (pp - sp) / sp
+        up_days = peak_idx - start_idx + 1
+        if gain >= self.uptrend_gain_threshold and up_days >= self.uptrend_min_days:
+            return peak_idx, gain
         return None
 
-    def _scan_consolidation(self, df: pd.DataFrame, start_idx: int,
-                            start_price: float) -> Optional[Tuple[int, int]]:
-        n = len(df)
-        for i in range(start_idx + self.consolidation_days_min, min(start_idx + 180, n)):
-            min_c = df.loc[start_idx:i, 'close'].min()
-            if (min_c - start_price) / start_price >= self.min_elevation:
-                return i, i - start_idx
+    def _check_consolidation(self, df: pd.DataFrame, si: int, pi: int,
+                             gain: float, n: int) -> Optional[dict]:
+        sp = float(df.loc[si, 'close'])
+
+        for ei in range(pi + self.consolidation_days_min, min(pi + 180, n)):
+            min_c = float(df.loc[pi:ei, 'close'].min())
+            if (min_c - sp) / sp >= self.min_elevation:
+                age = n - 1 - ei
+                recency = 1.0 / (1.0 + age / 30.0)
+                return {
+                    'si': si, 'pi': pi, 'ei': ei,
+                    'sd': str(df.loc[si, 'date'])[:10],
+                    'pd': str(df.loc[pi, 'date'])[:10],
+                    'ed': str(df.loc[ei, 'date'])[:10],
+                    'gain': gain, 'days': ei - pi,
+                    'score': gain * recency,
+                }
+
+        og_days = n - 1 - pi
+        if og_days >= self.consolidation_days_min:
+            min_c = float(df.loc[pi:n-1, 'close'].min())
+            if (min_c - sp) / sp >= self.min_elevation:
+                return {
+                    'si': si, 'pi': pi, 'ei': n - 1,
+                    'sd': str(df.loc[si, 'date'])[:10],
+                    'pd': str(df.loc[pi, 'date'])[:10],
+                    'ed': str(df.loc[n-1, 'date'])[:10],
+                    'gain': gain, 'days': og_days,
+                    'score': gain * 1.0,
+                }
         return None
 
-    def _build_result(self, df, start_i, peak_idx, gain, end_idx, days):
-        return {
-            'uptrend_start_idx': start_i,
-            'uptrend_start_date': str(df.loc[start_i, 'date'])[:10],
-            'uptrend_end_idx': peak_idx,
-            'uptrend_end_date': str(df.loc[peak_idx, 'date'])[:10],
-            'uptrend_gain': round(gain, 4),
-            'consolidation_start_idx': peak_idx,
-            'consolidation_start_date': str(df.loc[peak_idx, 'date'])[:10],
-            'consolidation_end_idx': end_idx,
-            'consolidation_end_date': str(df.loc[end_idx, 'date'])[:10],
-            'consolidation_days': days,
-            'pattern_score': round(gain, 2),
-            'type': 'factory',
-        }
+    def _fallback_scan(self, df: pd.DataFrame, n: int) -> List[dict]:
+        """If golden cross fails, scan backward from price peaks"""
+        results = []
+        for peak_idx in self._find_ma5_peaks(df, n):
+            pp = float(df.loc[peak_idx, 'close'])
+            for si in range(peak_idx - 5, max(peak_idx - 80, 10), -1):
+                sp = float(df.loc[si, 'close'])
+                gain = (pp - sp) / sp
+                up_days = peak_idx - si + 1
+                if gain < self.uptrend_gain_threshold or up_days < self.uptrend_min_days:
+                    continue
+                if pp < float(df.loc[si:peak_idx, 'close'].max()):
+                    continue
+                ci = self._check_consolidation(df, si, peak_idx, gain, n)
+                if ci:
+                    results.append(ci)
+                    break
+        return results
+
+    def _find_ma5_peaks(self, df: pd.DataFrame, n: int) -> List[int]:
+        peaks = set()
+        for i in range(15, n - self.consolidation_days_min):
+            if df.loc[i, 'close'] < df.loc[i, 'ma5']:
+                below = 1
+                for j in range(i + 1, min(i + 5, n)):
+                    if df.loc[j, 'close'] < df.loc[j, 'ma5']:
+                        below += 1
+                    else:
+                        break
+                if below >= 3:
+                    pk = i - 1
+                    for k in range(i - 2, max(i - 10, 0), -1):
+                        if df.loc[k, 'close'] > df.loc[pk, 'close']:
+                            pk = k
+                    peaks.add(pk)
+        return sorted(peaks)
