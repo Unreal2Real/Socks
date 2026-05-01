@@ -215,7 +215,7 @@ async function analyzeStock() {
   if (!code) return;
   document.getElementById('patternDetail').style.display = 'none';
   try {
-    const r = await fetch(`/api/stock/${code}?days=500`);
+    const r = await fetch(`/api/stock/${code}?days=250`);
     const j = await r.json();
     if (j.code !== 0) return alert(j.msg);
     document.getElementById('kline-placeholder').style.display = 'none';

@@ -286,6 +286,9 @@ class DataFetcher:
         if not plain.isdigit() or len(plain) != 6:
             return False
 
+        if plain.startswith('5') or plain.startswith('1'):
+            return False
+
         for kw in INDEX_KEYWORDS:
             if kw in name:
                 return False
