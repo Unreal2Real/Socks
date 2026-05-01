@@ -129,6 +129,22 @@ tr.unviewed td:first-child{font-weight:700}
 let chart = null, candleSeries = null, volumeSeries = null, lineSeries = {};
 let scanTimer = null;
 let viewedStocks = new Set();
+let scanResultsStore = [];
+
+document.addEventListener('DOMContentLoaded',function(){
+  loadLastScan();
+  document.getElementById('scanResults').addEventListener('click',function(e){
+    var tr = e.target.closest('tr');
+    if (!tr) return;
+    var code = tr.getAttribute('data-code');
+    if (code){
+      if (e.target.closest('button')) return;
+      if (e.target.closest('.btn-ml')) return;
+      var info = scanResultsStore.find(function(r){return r.stock_code===code;});
+      viewStock(code, info ? info.stock_name : '');
+    }
+  });
+});
 
 function createChart() {
   const el = document.getElementById('kline-chart');
@@ -315,25 +331,24 @@ function showResults(results) {
     const st = p.status || 'new';
     const fid = p.stock_code;
     const isNew = !viewedStocks.has(fid);
-    const rowClass = (st==='exited'?' style=\"opacity:.5\"':'') + (isNew?' class=\"unviewed\"':'');
     const dot = isNew ? '<span class=\"new-dot\"></span>' : '';
-    html += '<tr id=\"row-'+fid+'\"'+rowClass+'>'
-      + '<td onclick=\"viewStock(\''+fid+'\',\''+p.stock_name.replace(/'/g,'\\\'')+'\')\">'+dot+'</td>'
-      + '<td><code onclick=\"viewStock(\''+fid+'\',\''+p.stock_name.replace(/'/g,'\\\'')+'\')\">'+fid+'</code></td>'
-      + '<td>'+p.stock_name+'</td>'
-      + '<td><span class=\"tag tag-green\">'+p.pattern_score.toFixed(2)+'</span></td>'
-      + '<td class=\"text-green\">+'+(p.uptrend_gain*100).toFixed(1)+'%</td>'
-      + '<td>'+p.consolidation_days+'天</td>'
-      + '<td><span class=\"tag '+(statusTag[st]||'tag-gray')+'\">'+(statusLabel[st]||st)+'</span></td>'
-      + '<td>'+p.consolidation_end_date+'</td>'
-      + '<td id=\"ml-'+fid+'\">'
-      + '<button class=\"btn-ml btn-accept\" onclick=\"labelGood(\''+fid+'\',\''+p.stock_name.replace(/'/g,'\\\'')+'\')\" title=\"形态正确\">✅</button> '
-      + '<button class=\"btn-ml btn-reject\" onclick=\"labelBad(\''+fid+'\',\''+p.stock_name.replace(/'/g,'\\\'')+'\')\" title=\"形态不对\">❌</button>'
-      + '</td></tr>';
+    const rowAttrs = (st==='exited'?' style=\"opacity:.5\"':'') + (isNew?' class=\"unviewed\"':'');
+    html += '<tr id=\"row-'+fid+'\" data-code=\"'+fid+'\"'+rowAttrs+'><td>'+dot+'</td>'+
+      '<td><code>'+fid+'</code></td><td>'+p.stock_name+'</td>'+
+      '<td><span class=\"tag tag-green\">'+p.pattern_score.toFixed(2)+'</span></td>'+
+      '<td class=\"text-green\">+'+(p.uptrend_gain*100).toFixed(1)+'%</td>'+
+      '<td>'+p.consolidation_days+'天</td>'+
+      '<td><span class=\"tag '+(statusTag[st]||'tag-gray')+'\">'+(statusLabel[st]||st)+'</span></td>'+
+      '<td>'+p.consolidation_end_date+'</td>'+
+      '<td id=\"ml-'+fid+'\">'+
+      '<button class=\"btn-ml btn-accept\" onclick=\"event.stopPropagation();mlAction(\'good\',\''+fid+'\')\" title=\"形态正确\">✅</button> '+
+      '<button class=\"btn-ml btn-reject\" onclick=\"event.stopPropagation();mlAction(\'bad\',\''+fid+'\')\" title=\"形态不对\">❌</button>'+
+      '</td></tr>';
   });
   html += '</tbody></table>';
   el.innerHTML = html;
 
+  scanResultsStore = results;
   loadMLStats();
 }
 
@@ -355,16 +370,13 @@ async function loadLastScan() {
   } catch(e) {}
 }
 
-window.addEventListener('DOMContentLoaded', loadLastScan);
-
 function viewStock(code, name) {
   document.getElementById('stockCode').value = code;
   document.getElementById('currentStock').innerHTML = '<code>'+code+'</code> <span class="name">'+(name||'')+'</span>';
   viewedStocks.add(code);
   var row = document.getElementById('row-'+code);
-  if (row) { row.classList.remove('unviewed'); var td = row.querySelector('td'); if (td) td.innerHTML = ''; }
+  if (row) { row.classList.remove('unviewed'); var dot = row.querySelector('.new-dot'); if (dot) dot.remove(); }
   analyzeStock();
-  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function stopScan() {
@@ -391,6 +403,13 @@ async function loadMLFeatures(code) {
     }
   } catch(e) {}
   return null;
+}
+
+async function mlAction(label, code) {
+  var info = scanResultsStore.find(function(r){return r.stock_code===code;});
+  var name = info ? info.stock_name : '';
+  if (label === 'good') return labelGood(code, name);
+  if (label === 'bad') return labelBad(code, name);
 }
 
 async function labelGood(code, name) {
