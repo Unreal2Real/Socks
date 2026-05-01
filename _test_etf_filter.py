@@ -1,8 +1,8 @@
 import sys; sys.path.insert(0,'.')
 from data.fetcher import DataFetcher
 f = DataFetcher()
-tests = [('510050', '华夏上证50ETF'), ('159919', '沪深300ETF'), ('601398', '工商银行'), ('000001', '平安银行'), ('110029', '深证成指')]
+tests = [('510050','ETF'),('159919','指数'),('300750','创业板'),('300136','创业板'),('601398','主板'),('000001','主板'),('002008','中小板')]
 for code, name in tests:
-    result = f._is_main_board(code, name or code)
-    print(code, name, "PASS" if result else "FILTERED")
+    ok = f._is_main_board(code, name)
+    print(code, name, 'PASS' if ok else 'FILTERED')
 f.close()
