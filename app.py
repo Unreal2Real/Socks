@@ -9,6 +9,7 @@ from pattern.recognizer import PatternRecognizer
 from scanner.engine import ScanEngine
 from _config import FACTORY_PATTERN, SCAN
 from ml import labels, trainer, features as ml_features
+from ai.analysis import analyze as ai_analyze
 
 app = Flask(__name__, template_folder='templates', static_folder='.')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -185,6 +186,38 @@ def api_ml_features(code):
         'features': feat,
         'ml_probability': ml_prob,
     })
+
+
+@app.route('/api/ai/analyze/<code>')
+def api_ai_analyze(code):
+    if len(code) != 6 or not code.isdigit():
+        return jsonify({'code': 1, 'msg': '无效代码'})
+
+    stock_name = ''
+    try:
+        stocks = fetcher.stock_list()
+        for c, n in stocks:
+            if c == code:
+                stock_name = n
+                break
+    except Exception:
+        pass
+
+    if not stock_name:
+        df = fetcher.daily_data(code, days=30)
+        if not df.empty:
+            try:
+                pattern = recognizer.find_pattern(df, max_days_back=SCAN.get('max_days_back'))
+                if pattern and pattern.get('stock_name'):
+                    stock_name = pattern['stock_name']
+            except Exception:
+                pass
+
+    try:
+        result = ai_analyze(code, stock_name)
+        return jsonify({'code': 0, 'data': result})
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'分析失败: {str(e)}'})
 
 
 if __name__ == '__main__':
